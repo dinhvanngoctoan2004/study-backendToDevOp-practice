@@ -1,5 +1,7 @@
 import express, { type Request, type Response } from 'express';
-
+import { connectMongo } from './config/mongo.js';
+import mongoose from 'mongoose';
+import { start } from 'node:repl';
 const app = express();
 
 const PORT = process.env.PORT || 3000;
@@ -10,36 +12,25 @@ app.listen(Number(PORT), () => {
   console.log(`[server]: Server is runing at http://localhost:${PORT}`);
 });
 
-app.get('/ready', (req: Request, res: Response) => {
+app.get('/health', async (req: Request, res: Response) => {
   try {
-    res.status(200).json({
-      success: true,
-      message: 'trả về dữ liệu thành công',
-      timeStamp: new Date().toDateString(),
-    });
-  } catch (err) {
-    res.status(500).json({
-      success: false,
-      error: err,
-      timeStamp: new Date().toDateString(),
-    });
-    console.log('500: /ready.get: ' + err);
+    await connectMongo();
+  } catch (error) {
+    console.error('Database connection failed during startup');
+    process.exit(1);
   }
 });
 
-app.get('/health', (req: Request, res: Response) => {
-  try {
-    res.status(200).json({
-      success: true,
-      message: 'trả về dữ liệu thành công',
-      timeStamp: new Date().toDateString(),
+app.get('/ready', async (req: Request, res: Response) => {
+  const idDBConnected = mongoose.connection.readyState === 1;
+  if (!idDBConnected) {
+    return res.status(503).json({
+      status: 'unavailable',
+      database: 'disconnected',
     });
-  } catch (err) {
-    res.status(500).json({
-      success: false,
-      error: err,
-      timeStamp: new Date().toDateString(),
-    });
-    console.log('500: /health.get: ' + err);
   }
+  return res.status(200).json({
+    status: 'ready',
+    databse: 'connected;',
+  });
 });
