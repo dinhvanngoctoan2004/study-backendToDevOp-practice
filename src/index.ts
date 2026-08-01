@@ -1,7 +1,7 @@
 import express, { type Request, type Response } from 'express';
 import { connectMongo } from './config/mongo.js';
 import mongoose from 'mongoose';
-import { start } from 'node:repl';
+
 const app = express();
 
 const PORT = process.env.PORT || 3000;
