@@ -1,24 +1,19 @@
+import dotenv from 'dotenv';
+dotenv.config();
 import express, { type Request, type Response } from 'express';
 import { connectMongo } from './config/mongo.js';
 import mongoose from 'mongoose';
+import { uptime } from 'node:process';
 
 const app = express();
 
-const PORT = process.env.PORT || 3000;
-
-app.use(express.json());
-
-app.listen(Number(PORT), () => {
-  console.log(`[server]: Server is runing at http://localhost:${PORT}`);
-});
+// app.use(express.json());
 
 app.get('/health', async (req: Request, res: Response) => {
-  try {
-    await connectMongo();
-  } catch (error) {
-    console.error('Database connection failed during startup');
-    process.exit(1);
-  }
+  res.status(200).json({
+    status: 'available',
+    uptime: process.uptime,
+  });
 });
 
 app.get('/ready', async (req: Request, res: Response) => {
@@ -34,3 +29,19 @@ app.get('/ready', async (req: Request, res: Response) => {
     databse: 'connected;',
   });
 });
+
+const bootstrap = async () => {
+  try {
+    await connectMongo();
+    console.log('Database connected succcessfully');
+    const PORT = process.env.PORT || 3000;
+    app.listen(Number(PORT), () => {
+      console.log(`[server]: Server is runing at http://localhost:${PORT}`);
+    });
+  } catch (err) {
+    console.error('Application failed to start: ' + err);
+    process.exit(1);
+  }
+};
+
+bootstrap();

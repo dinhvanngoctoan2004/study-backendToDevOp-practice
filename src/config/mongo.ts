@@ -20,5 +20,6 @@ export const connectMongo = async (): Promise<void> => {
   } catch (error) {
     isConnected = false;
     console.error('MongoDB connection error : ' + error);
+    throw error;
   }
 };
