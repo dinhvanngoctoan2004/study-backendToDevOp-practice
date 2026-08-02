@@ -3,22 +3,21 @@ dotenv.config();
 import express, { type Request, type Response } from 'express';
 import { connectMongo } from './config/mongo.js';
 import mongoose from 'mongoose';
-import { uptime } from 'node:process';
 
 const app = express();
 
-// app.use(express.json());
+app.use(express.json());
 
 app.get('/health', async (req: Request, res: Response) => {
   res.status(200).json({
     status: 'available',
-    uptime: process.uptime,
+    uptime: process.uptime(),
   });
 });
 
 app.get('/ready', async (req: Request, res: Response) => {
-  const idDBConnected = mongoose.connection.readyState === 1;
-  if (!idDBConnected) {
+  const isDBConnected = mongoose.connection.readyState === 1;
+  if (!isDBConnected) {
     return res.status(503).json({
       status: 'unavailable',
       database: 'disconnected',
@@ -26,7 +25,7 @@ app.get('/ready', async (req: Request, res: Response) => {
   }
   return res.status(200).json({
     status: 'ready',
-    databse: 'connected;',
+    databse: 'connected',
   });
 });
 
