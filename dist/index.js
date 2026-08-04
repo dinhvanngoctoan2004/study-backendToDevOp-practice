@@ -3,8 +3,10 @@ dotenv.config();
 import express, {} from 'express';
 import { connectMongo } from './config/mongo.js';
 import mongoose from 'mongoose';
+import authRouter from './routes/auth.routes.js';
 const app = express();
 app.use(express.json());
+app.use('/api/auth', authRouter);
 app.get('/health', async (req, res) => {
     res.status(200).json({
         status: 'available',
@@ -21,13 +23,13 @@ app.get('/ready', async (req, res) => {
     }
     return res.status(200).json({
         status: 'ready',
-        databse: 'connected',
+        database: 'connected',
     });
 });
 const bootstrap = async () => {
     try {
         await connectMongo();
-        console.log('Database connected succcessfully');
+        console.log('Database connected successfully');
         const PORT = process.env.PORT || 3000;
         app.listen(Number(PORT), () => {
             console.log(`[server]: Server is runing at http://localhost:${PORT}`);

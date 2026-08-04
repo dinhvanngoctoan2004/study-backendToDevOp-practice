@@ -1,5 +1,4 @@
 import mongoose from 'mongoose';
-let isConnected = false;
 export const connectMongo = async () => {
     const mongoUri = process.env.MONGO_URI;
     if (!mongoUri) {
@@ -12,11 +11,9 @@ export const connectMongo = async () => {
             serverSelectionTimeoutMS: 500,
             socketTimeoutMS: 4500,
         });
-        isConnected = true;
         console.log('MongoDB Connected succcessfully');
     }
     catch (error) {
-        isConnected = false;
         console.error('MongoDB connection error : ' + error);
         throw error;
     }
