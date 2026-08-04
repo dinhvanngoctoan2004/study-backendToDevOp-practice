@@ -4,8 +4,8 @@ export const connectMongo = async (): Promise<void> => {
   const mongoUri = process.env.MONGO_URI;
 
   if (!mongoUri) {
-    console.error('MONGO_URI is not defined in enviroment variables');
-    throw new Error('MONGO_URI is not defined in enviroment variables');
+    console.error('MONGO_URI is not defined in environment variables');
+    throw new Error('MONGO_URI is not defined in environment variables');
   }
   try {
     await mongoose.connect(mongoUri, {
@@ -14,7 +14,7 @@ export const connectMongo = async (): Promise<void> => {
       socketTimeoutMS: 4500,
     });
 
-    console.log('MongoDB Connected succcessfully');
+    console.log('MongoDB Connected successfully');
   } catch (error) {
     console.error('MongoDB connection error : ' + error);
     throw error;

@@ -4,7 +4,7 @@ import express, {} from 'express';
 import { connectMongo } from './config/mongo.js';
 import mongoose from 'mongoose';
 import authRouter from './routes/auth.routes.js';
-import { errorHandler } from './middlewares/errorHandler.js';
+import { erro404, errorHandler } from './middlewares/errorHandler.js';
 const app = express();
 app.use(express.json());
 app.get('/health', async (req, res) => {
@@ -27,6 +27,7 @@ app.get('/ready', async (req, res) => {
     });
 });
 app.use('/api/auth', authRouter);
+app.use(erro404);
 app.use(errorHandler);
 const bootstrap = async () => {
     try {

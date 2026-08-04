@@ -11,8 +11,8 @@ export class AppError extends Error {
   }
 }
 
-export const errorHandler = (err: Error, _req: Request, res: Response, _next: NextFunction) => {
-  console.error('Error: ' + err);
+export const errorHandler = (err: Error, _req: Request, res: Response, next: NextFunction) => {
+  console.error('Error: ', err);
 
   if (err instanceof AppError) {
     return res.status(err.statusCode).json({
@@ -23,6 +23,17 @@ export const errorHandler = (err: Error, _req: Request, res: Response, _next: Ne
     });
   }
 
+  if(err instanceof SyntaxError && 'status' in err && (err as any).status === 400 && 'body' in err){
+    return res.status(400).json({
+      error: {
+        code: 'INVALID_JSON',
+        message: 'Dự liệu Json gửi lên không đúng định dạng',
+      }
+    })
+  }
+
+  if(res.headersSent){return next(err)}
+
   return res.status(500).json({
     error: {
       code: 'INTERNAL_ERROR',
@@ -30,3 +41,7 @@ export const errorHandler = (err: Error, _req: Request, res: Response, _next: Ne
     },
   });
 };
+
+export const error404 = (_req:Request, _res:Response, next:NextFunction)=>{
+  next(new AppError(404, 'NOT_FOUND', 'Không tìm thấy API'))
+}
