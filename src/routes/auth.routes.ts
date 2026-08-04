@@ -4,8 +4,15 @@ import { validate } from '../middlewares/validate.js';
 
 const router: Router = Router();
 
-router.post('/login', validate(loginSchema), (_req, _res) => {
-  ////
+router.post('/login', validate(loginSchema), (req, res,next) => {
+  try{
+    res.status(200).json({
+      message: 'Login success',
+    });
+
+  }catch(err){
+    next(err);
+  }
 });
 
 export default router;

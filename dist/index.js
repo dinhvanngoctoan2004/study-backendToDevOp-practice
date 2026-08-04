@@ -4,9 +4,9 @@ import express, {} from 'express';
 import { connectMongo } from './config/mongo.js';
 import mongoose from 'mongoose';
 import authRouter from './routes/auth.routes.js';
+import { errorHandler } from './middlewares/errorHandler.js';
 const app = express();
 app.use(express.json());
-app.use('/api/auth', authRouter);
 app.get('/health', async (req, res) => {
     res.status(200).json({
         status: 'available',
@@ -26,6 +26,8 @@ app.get('/ready', async (req, res) => {
         database: 'connected',
     });
 });
+app.use('/api/auth', authRouter);
+app.use(errorHandler);
 const bootstrap = async () => {
     try {
         await connectMongo();

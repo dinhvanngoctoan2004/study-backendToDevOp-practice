@@ -4,11 +4,10 @@ import express, { type Request, type Response } from 'express';
 import { connectMongo } from './config/mongo.js';
 import mongoose from 'mongoose';
 import authRouter from './routes/auth.routes.js';
+import { errorHandler } from './middlewares/errorHandler.js';
 
 const app = express();
 app.use(express.json());
-
-app.use('/api/auth', authRouter);
 
 app.get('/health', async (req: Request, res: Response) => {
   res.status(200).json({
@@ -30,6 +29,11 @@ app.get('/ready', async (req: Request, res: Response) => {
     database: 'connected',
   });
 });
+
+
+
+app.use('/api/auth', authRouter);
+app.use(errorHandler)
 
 const bootstrap = async () => {
   try {
