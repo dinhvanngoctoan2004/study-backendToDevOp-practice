@@ -9,7 +9,6 @@ router.post('/login', validate(loginSchema), (req, res,next) => {
     res.status(200).json({
       message: 'Login success',
     });
-
   }catch(err){
     next(err);
   }
