@@ -18,7 +18,7 @@ app.use(express.json());
 
 
 
-
+app.use('/api/auth', authRouter);
 
 app.get('/health', async (req: Request, res: Response) => {
   res.status(200).json({
@@ -43,11 +43,10 @@ app.get('/ready', async (req: Request, res: Response) => {
 
 
 
-app.use('/api/auth', authRouter);
 
 app.use(error404);
-
 app.use(errorHandler);
+
 
 const bootstrap = async () => {
   try {
