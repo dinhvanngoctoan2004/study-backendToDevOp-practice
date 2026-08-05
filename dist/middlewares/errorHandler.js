@@ -1,3 +1,4 @@
+import { logger } from '../config/logger.js';
 export class AppError extends Error {
     statusCode;
     code;
@@ -9,7 +10,7 @@ export class AppError extends Error {
     }
 }
 export const errorHandler = (err, _req, res, next) => {
-    console.error('Error: ', err);
+    logger.error(err);
     if (err instanceof AppError) {
         return res.status(err.statusCode).json({
             error: {
@@ -36,7 +37,7 @@ export const errorHandler = (err, _req, res, next) => {
         },
     });
 };
-export const erro404 = (_req, _res, next) => {
+export const error404 = (_req, _res, next) => {
     next(new AppError(404, 'NOT_FOUND', 'Không tìm thấy API'));
 };
 //# sourceMappingURL=errorHandler.js.map

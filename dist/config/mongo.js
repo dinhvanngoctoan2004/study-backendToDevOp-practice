@@ -1,8 +1,9 @@
 import mongoose from 'mongoose';
+import { logger } from './logger.js';
 export const connectMongo = async () => {
     const mongoUri = process.env.MONGO_URI;
     if (!mongoUri) {
-        console.error('MONGO_URI is not defined in environment variables');
+        logger.error('MONGO_URI is not defined in environment variables');
         throw new Error('MONGO_URI is not defined in environment variables');
     }
     try {
@@ -11,10 +12,10 @@ export const connectMongo = async () => {
             serverSelectionTimeoutMS: 500,
             socketTimeoutMS: 4500,
         });
-        console.log('MongoDB Connected successfully');
+        logger.info('MongoDB Connected successfully');
     }
     catch (error) {
-        console.error('MongoDB connection error : ' + error);
+        logger.error('MongoDB connection error : ' + error);
         throw error;
     }
 };

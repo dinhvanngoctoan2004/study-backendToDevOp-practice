@@ -5,9 +5,20 @@ import { connectMongo } from './config/mongo.js';
 import mongoose from 'mongoose';
 import authRouter from './routes/auth.routes.js';
 import { error404, errorHandler } from './middlewares/errorHandler.js';
+import morgan from 'morgan';
+import { requestId } from './middlewares/requestId.js';
+import { logger } from './config/logger.js';
 
 const app = express();
+app.use(requestId);
+app.use(morgan(':method :url :status :res[content-length] - :response-time ms [req-id: :req[x-request-id]]'));
 app.use(express.json());
+
+
+
+
+
+
 
 app.get('/health', async (req: Request, res: Response) => {
   res.status(200).json({
@@ -41,13 +52,13 @@ app.use(errorHandler);
 const bootstrap = async () => {
   try {
     await connectMongo();
-    console.log('Database connected successfully');
+    logger.info('Database connected successfully');
     const PORT = process.env.PORT || 3000;
     app.listen(Number(PORT), () => {
-      console.log(`[server]: Server is runing at http://localhost:${PORT}`);
+      logger.info(`[server]: Server is runing at http://localhost:${PORT}`);
     });
   } catch (err) {
-    console.error('Application failed to start: ' + err);
+    logger.error('Application failed to start: ' + err);
     process.exit(1);
   }
 };
