@@ -1,0 +1,131 @@
+{
+  "review_metadata": {
+    "date": "2026-08-05",
+    "exercise": "Logger (Pino + Morgan) & Request ID + hoàn thiện Error Handling (404, malformed JSON)",
+    "phase": "Backend - Logger, Request ID & Error Handling",
+    "commit_hash": "4b8c673",
+    "files_reviewed": [
+      "src/index.ts",
+      "src/config/logger.ts",
+      "src/config/mongo.ts",
+      "src/middlewares/errorHandler.ts",
+      "src/middlewares/requestId.ts",
+      "src/middlewares/validate.ts",
+      "src/routes/auth.routes.ts",
+      "src/schemas/validation.ts",
+      "package.json",
+      ".gitignore",
+      ".env.development",
+      ".env.test",
+      ".env.production"
+    ]
+  },
+  "overall_score": 8.5,
+  "verdict": "APPROVED_WITH_CHANGES",
+  "critical_issues": [],
+  "improvements": [
+    {
+      "severity": "MEDIUM",
+      "file": "src/index.ts",
+      "line": 2,
+      "issue": "`dotenv.config()` chỉ load file `.env`, nhưng repo không có `.env` — chỉ có `.env.development`, `.env.test`, `.env.production` (đã được commit). Các file env này không bao giờ được nạp.",
+      "impact": "Ở một máy clone sạch, `pnpm dev` (NODE_ENV=development) sẽ không đọc được MONGO_URI từ `.env.development` → `connectMongo` ném lỗi → bootstrap catch → `process.exit(1)`. App không thể khởi động theo đúng workflow đã document trong README trừ khi env được export thủ công.",
+      "suggestion": "Nạp file theo NODE_ENV: `dotenv.config({ path: `.env.${process.env.NODE_ENV ?? 'development'}` });` đặt ngay sau khi biết NODE_ENV (hoặc dùng `cross-env` đã có sẵn trong script dev)."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "src/middlewares/errorHandler.ts",
+      "line": 36,
+      "issue": "Kiểm tra `res.headersSent` được đặt SAU các nhánh `AppError` (dòng 18) và `SyntaxError` (dòng 27). Nếu headers đã được gửi (ví dụ lỗi xảy ra giữa lúc stream response) và `err` là AppError, nhánh này vẫn gọi `res.status(...)` → Express ném `ERR_HTTP_HEADERS_SENT`.",
+      "impact": "Đúng ý đồ của khuyến nghị review trước nhưng sai thứ tự: ở các trường hợp edge (lỗi sau khi đã gửi một phần response) server vẫn crash thay vì delegate `next(err)`. Kiểm tra này phải là điều kiện ĐẦU TIÊN của error handler.",
+      "suggestion": "Đưa `if (res.headersSent) return next(err);` lên dòng đầu tiên của hàm, trước mọi nhánh xử lý khác."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "src/config/mongo.ts",
+      "line": 20,
+      "issue": "Vẫn còn 2 chỗ nối chuỗi Error object vào message log: `logger.error('MongoDB connection error : ' + error)` (mongo.ts:20) và `logger.error('Application failed to start: ' + err)` (index.ts:60).",
+      "impact": "Nối chuỗi ép Error thành string `[object Object]` hoặc chỉ message, mất toàn bộ stack trace — đúng lỗi đã được chỉ ra ở review exercise-02 và đã sửa đúng tại errorHandler.ts:16 (`logger.error(err)`), nhưng pattern này còn sót ở 2 nơi khác.",
+      "suggestion": "Truyền error object làm tham số riêng: `logger.error(error, 'MongoDB connection error')` — Pino sẽ serialize stack trace đầy đủ."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": ".gitignore",
+      "line": 1,
+      "issue": ".gitignore chỉ chứa `node_modules` nên `dist/` (40+ file build artifact, kèm sourceMap) và cả 3 file `.env.*` đang bị commit vào git.",
+      "impact": "Build output luôn lỗi thời tiềm ẩn so với src, gây nhiễu diff; nghiêm trọng hơn, việc commit file env tạo tiền lệ — một ngày nào đó giá trị thật của `.env.production` (đúng như README cảnh báo 'không commit giá trị thật') có thể bị đẩy lên remote và rò rỉ.",
+      "suggestion": "Thêm `dist` và `.env*` vào .gitignore; chạy `git rm -r --cached dist .env.development .env.test .env.production` để bỏ theo dõi (file vẫn còn ở local). Build artifacts nên do CI tạo ra, không nằm trong git."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "package.json",
+      "line": 12,
+      "issue": "README document script `pnpm lint` (ESLint check) nhưng package.json không có script `lint`; script `test` vẫn là placeholder `echo \"Error: no test specified\" && exit 1`. Ngoài ra tồn tại song song 2 cấu hình ESLint: `.eslintrc.json` (legacy) và `eslint.config.js` (flat) — ESLint 10 chỉ đọc flat config nên `.eslintrc.json` là dead code.",
+      "impact": "Không thể chạy kiểm tra chất lượng code bằng lệnh document; không có baseline test cho checkpoint tiếp theo; học viên có thể nhầm lẫn khi sửa config ESLint cũ.",
+      "suggestion": "Thêm `\"lint\": \"eslint src --max-warnings 0\"` (hoặc `eslint .` với flat config), xóa `.eslintrc.json`, và thiết lập Jest + Supertest theo roadmap cho bài sau."
+    },
+    {
+      "severity": "LOW",
+      "file": "src/middlewares/errorHandler.ts",
+      "line": 27,
+      "issue": "Dùng `(err as any).status` để kiểm tra malformed JSON — cast qua `any` phá vỡ type safety (tsconfig đang bật strict).",
+      "impact": "Vi phạm tinh thần TypeScript strict của dự án; nếu body-parser đổi cấu trúc lỗi, lỗi sẽ không được compiler bắt.",
+      "suggestion": "Dùng type guard hẹp: `err instanceof SyntaxError && (err as SyntaxError & { status?: number }).status === 400` hoặc kiểm tra `(err as { type?: string }).type === 'entity.parse.failed'`."
+    },
+    {
+      "severity": "LOW",
+      "file": "src/index.ts",
+      "line": 57,
+      "issue": "Còn typo trong log: `runing` (index.ts:57) và `Dự liệu Json` (errorHandler.ts:31).",
+      "impact": "Giảm tính chuyên nghiệp; log sai chính tả khó grep/đánh chỉ số.",
+      "suggestion": "Sửa thành `running` và `Dữ liệu JSON`."
+    },
+    {
+      "severity": "LOW",
+      "file": "src/middlewares/requestId.ts",
+      "line": 5,
+      "issue": "Middleware tin tưởng tuyệt đối giá trị `x-request-id` client gửi lên (không giới hạn độ dài, không sanitize), và cast `as string` che giấu khả năng header là `string[]` khi client gửi trùng header.",
+      "impact": "Client có thể gửi request-id chứa ký tự xuống dòng/kiểm soát để chèn log giả mạo (log injection) — giá trị này được in trực tiếp vào morgan log; header dạng mảng sẽ cho ra giá trị lạ.",
+      "suggestion": "Cân nhắc luôn tự sinh UUID phía server (bỏ qua giá trị client) hoặc sanitize/truncate (vd: chỉ chấp nhận `[A-Za-z0-9-]{1,64}`), và xử lý đúng kiểu `string | string[] | undefined` thay vì cast."
+    },
+    {
+      "severity": "LOW",
+      "file": "src/routes/auth.routes.ts",
+      "line": 7,
+      "issue": "try/catch bao quanh `res.status(200).json(...)` đồng bộ là vô dụng (res.json không throw đồng bộ; Express 5 đã tự bắt lỗi trong sync handler); đồng thời thiếu khoảng trắng `res,next`.",
+      "impact": "Code nhiễu, tạo cảm giác sai về nơi cần xử lý lỗi; formatting không nhất quán với Prettier config.",
+      "suggestion": "Bỏ try/catch thừa, giữ handler đơn giản `(req, res) => { res.status(200).json({...}); }`; thêm khoảng trắng `res, next` và chạy Prettier."
+    },
+    {
+      "severity": "LOW",
+      "file": "src/config/mongo.ts",
+      "line": 14,
+      "issue": "`serverSelectionTimeoutMS: 500` được hardcode rất thấp và `socketTimeoutMS: 4500` — phù hợp fail-fast local nhưng rủi ro trên môi trường thật (network latency, MongoDB Atlas qua internet).",
+      "impact": "Khi deploy lên EC2/Atlas (roadmap), app có thể fail khởi động do timeout quá ngắn chỉ vì network chậm, gây false-negative readiness.",
+      "suggestion": "Đưa các giá trị này vào env config (vd: `MONGO_SERVER_SELECTION_TIMEOUT_MS`) với default hợp lý (30000) thay vì hardcode."
+    }
+  ],
+  "positives": [
+    "Tích hợp Pino logger đúng chuẩn roadmap: JSON log ở production, pino-pretty ở dev, level đọc từ env — cấu trúc gọn gàng, không có console.log.",
+    "Morgan access log format kèm `x-request-id` giúp truy vết request end-to-end — kết hợp tốt với middleware requestId (tự sinh UUID khi client không gửi, set response header).",
+    "Đã bổ sung đầy đủ các khuyến nghị của review exercise-02: middleware 404 trả JSON `NOT_FOUND`, xử lý malformed JSON trả 400 `INVALID_JSON`, và có kiểm tra `res.headersSent` (chỉ cần sửa thứ tự).",
+    "`logger.error(err)` tại errorHandler.ts:16 truyền đúng Error object — giữ nguyên stack trace, đúng pattern đã được review trước.",
+    "Bootstrap pattern chuẩn: connect DB trước, listen sau; `process.exit(1)` chỉ nằm ở bootstrap (không còn trong request handler như lỗi CRITICAL exercise-01).",
+    "/health không phụ thuộc DB, /ready trả 503 khi `readyState !== 1` — đúng phân tách liveness/readiness probe.",
+    "Các response lỗi trong toàn app (AppError, VALIDATION_ERROR, INVALID_JSON, NOT_FOUND, INTERNAL_ERROR) đều nhất quán format `{ error: { code, message, details? } }`."
+  ],
+  "checkpoint_status": {
+    "meets_requirements": [
+      "Có logger Pino cấu hình theo môi trường (JSON prod / pretty dev, level từ env)",
+      "Có Morgan HTTP access log kèm request-id để truy vết request",
+      "Có middleware requestId tự sinh UUID và set header x-request-id hai chiều",
+      "Có middleware 404 trả JSON chuẩn hóa",
+      "Xử lý malformed JSON trả 400 INVALID_JSON",
+      "Có kiểm tra res.headersSent trong error handler",
+      "Tất cả khuyến nghị MEDIUM/LOW của exercise-02 đã được xử lý (trừ thứ tự headersSent cần đảo lên đầu)"
+    ],
+    "missing_requirements": [],
+    "note": "Đạt toàn bộ yêu cầu trọng tâm bài Logger & Request ID. Các vấn đề còn lại ở mức MEDIUM/LOW: dotenv chưa load file theo NODE_ENV, thứ tự kiểm tra headersSent, nối chuỗi error trong log ở mongo.ts/index.ts, gitignore thiếu dist/.env*, thiếu script lint/test."
+  },
+  "recommendation_for_mentor": "Học viên đã nắm tốt kỹ thuật tích hợp Pino/Morgan và hoàn thiện error handling. Mentor nên hướng dẫn tiếp: (1) Cách load env đúng theo NODE_ENV với dotenv (path động) và ý nghĩa của việc không commit .env/dist vào git; (2) Thứ tự ưu tiên trong error handler — headersSent phải là nhánh đầu tiên; (3) Kỹ thuật log Error object với Pino (`logger.error(err, msg)`) để giữ stack trace, tránh nối chuỗi; (4) Chuẩn bị bài tiếp theo: thiết lập Jest + Supertest cho các route hiện có, và xem xét graceful shutdown (SIGTERM/SIGINT) trước khi deploy; (5) Lưu ý bảo mật log: sanitize request-id client gửi lên để tránh log injection."
+}
