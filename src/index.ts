@@ -1,5 +1,5 @@
 import dotenv from 'dotenv';
-dotenv.config();
+dotenv.config({path:`.env.${process.env.NODE_ENV || 'development'}`});
 import express, { type Request, type Response } from 'express';
 import { connectMongo } from './config/mongo.js';
 import mongoose from 'mongoose';
@@ -57,7 +57,7 @@ const bootstrap = async () => {
       logger.info(`[server]: Server is runing at http://localhost:${PORT}`);
     });
   } catch (err) {
-    logger.error('Application failed to start: ' + err);
+    logger.error(err,'Application failed to start');
     process.exit(1);
   }
 };

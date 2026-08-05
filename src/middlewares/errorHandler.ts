@@ -15,6 +15,8 @@ export class AppError extends Error {
 export const errorHandler = (err: Error, _req: Request, res: Response, next: NextFunction) => {
   logger.error(err);
 
+  if(res.headersSent){return next(err)}
+
   if (err instanceof AppError) {
     return res.status(err.statusCode).json({
       error: {
@@ -33,7 +35,7 @@ export const errorHandler = (err: Error, _req: Request, res: Response, next: Nex
     })
   }
 
-  if(res.headersSent){return next(err)}
+
 
   return res.status(500).json({
     error: {
