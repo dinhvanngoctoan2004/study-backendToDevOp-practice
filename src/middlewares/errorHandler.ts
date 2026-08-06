@@ -30,7 +30,7 @@ export const errorHandler = (err: Error, _req: Request, res: Response, next: Nex
     return res.status(400).json({
       error: {
         code: 'INVALID_JSON',
-        message: 'Dự liệu Json gửi lên không đúng định dạng',
+        message: 'The submitted JSON data is not in the correct format.',
       }
     })
   }
@@ -40,11 +40,11 @@ export const errorHandler = (err: Error, _req: Request, res: Response, next: Nex
   return res.status(500).json({
     error: {
       code: 'INTERNAL_ERROR',
-      message: 'Lỗi server',
+      message: 'Server error',
     },
   });
 };
 
 export const error404 = (_req:Request, _res:Response, next:NextFunction)=>{
-  next(new AppError(404, 'NOT_FOUND', 'Không tìm thấy API'))
+  next(new AppError(404, 'NOT_FOUND', 'API not found'))
 }
