@@ -1,0 +1,152 @@
+{
+  "review_metadata": {
+    "date": "2026-08-06",
+    "exercise": "Swagger / OpenAPI API Documentation (Swagger UI, swagger.yaml) + hoàn thiện health/ready probes",
+    "phase": "Backend - API Documentation (Swagger) & Deployment readiness probes",
+    "commit_hash": "07769c3",
+    "files_reviewed": [
+      "src/index.ts",
+      "src/docs/swagger.yaml",
+      "src/config/logger.ts",
+      "src/config/mongo.ts",
+      "src/middlewares/errorHandler.ts",
+      "src/middlewares/requestId.ts",
+      "src/middlewares/validate.ts",
+      "src/routes/auth.routes.ts",
+      "src/schemas/validation.ts",
+      "package.json",
+      ".gitignore",
+      ".env.development",
+      ".env.test",
+      ".env.production"
+    ]
+  },
+  "overall_score": 8.0,
+  "verdict": "APPROVED_WITH_CHANGES",
+  "critical_issues": [],
+  "improvements": [
+    {
+      "severity": "MEDIUM",
+      "file": "src/index.ts",
+      "line": 2,
+      "issue": "Vấn đề thứ tự khởi tạo ESM: `dotenv.config({ path: \".env.${NODE_ENV}\" })` nằm trong thân module, nhưng `import { logger } from './config/logger.js'` bị hoisted và được evaluate TRƯỚC khi dòng `dotenv.config()` chạy. `logger.ts` đọc `process.env.LOG_LEVEL` (và `NODE_ENV`) ở cấp module-top — tại thời điểm đó biến vẫn chưa được nạp từ file env.",
+      "impact": "Mọi file `.env.*` đều khai báo `LOG_LEVEL=debug/info` nhưng giá trị này không bao giờ tới được logger — mức log luôn rơi về default `info`. MONGO_URI may mắn không bị ảnh hưởng vì nó được đọc bên trong hàm `connectMongo()` (chạy sau khi dotenv đã load). Điểm tích cực 'level đọc từ env' của review exercise-03 giờ bị phá vỡ bởi chính thay đổi dotenv mới.",
+      "suggestion": "Nạp env trước mọi import app: tách thành module riêng `import './config/env.js'` đặt là import đầu tiên (module này chạy dotenv.config trước khi các module khác được evaluate), hoặc dùng cờ runtime `node --env-file-if-exists=.env.${NODE_ENV}` / `tsx --env-file` trong script dev, hoặc đọc LOG_LEVEL một cách lazy (function) thay vì tại module-top."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": ".gitignore",
+      "line": 1,
+      "issue": ".gitignore vẫn chỉ chứa `node_modules` nên cả 3 file `.env.*` đang được commit lên git (đã xác nhận qua `git ls-files`), cùng việc `dist/` sẽ không được loại trừ.",
+      "impact": "Đúng lỗi MEDIUM đã chỉ ra ở exercise-03 nhưng chưa được sửa. Việc commit file env tạo tiền lệ rò rỉ — một ngày nào đó `.env.production` chứa giá trị thật (đúng như README cảnh báo 'không commit giá trị thật') có thể bị đẩy lên remote.",
+      "suggestion": "Thêm `dist` và `.env*` vào .gitignore rồi `git rm -r --cached .env.development .env.test .env.production` (file vẫn giữ ở local, chỉ bỏ theo dõi). Giữ lại một `.env.example` có giá trị mẫu để người khác clone về biết cần những biến gì."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "package.json",
+      "line": 12,
+      "issue": "README vẫn document script `pnpm lint` nhưng package.json không có `lint`; script `test` vẫn là placeholder `echo \"Error: no test specified\" && exit 1`; vẫn tồn tại song song `.eslintrc.json` (legacy) và `eslint.config.js` (flat) — ESLint 10 chỉ đọc flat config nên `.eslintrc.json` là dead code.",
+      "impact": "Đúng lỗi MEDIUM của exercise-03 chưa xử lý: không chạy được kiểm tra chất lượng bằng lệnh document, chưa có baseline test cho các checkpoint tiếp theo.",
+      "suggestion": "Thêm `\"lint\": \"eslint src --max-warnings 0\"`, xóa `.eslintrc.json`, và thiết lập Jest + Supertest cho các route /health, /ready, /api/auth/login trước bài tiếp theo."
+    },
+    {
+      "severity": "LOW",
+      "file": "src/docs/swagger.yaml",
+      "line": 1,
+      "issue": "Nhiều lỗi chính tả / dùng từ sai trong mô tả API: `trạng thái sông` (sống), `sẳn sàng` (sẵn sàng), `phục vụ trafic` (traffic), `các dependecy` (dependencies), `Local Developmen server` (Development).",
+      "impact": "Tài liệu API là mặt tiền của dự án và sẽ xuất hiện trực tiếp trên Swagger UI tại /api-docs — lỗi chính tả làm giảm độ chuyên nghiệp, gây khó hiểu cho người tiêu dùng API.",
+      "suggestion": "Dò và sửa toàn bộ typo trong swagger.yaml; xem xét dùng `description` song ngữ hoặc chuẩn hóa tiếng Anh để tài liệu nhất quán."
+    },
+    {
+      "severity": "LOW",
+      "file": "src/docs/swagger.yaml",
+      "line": 10,
+      "issue": "`servers[].url` hardcode `http://localhost:3000` trong khi PORT đọc từ env (mặc định 3000).",
+      "impact": "Khi deploy lên EC2 (roadmap), Swagger UI vẫn trỏ về localhost của máy người xem → nút 'Try it out' gửi request sai địa chỉ, gây nhầm lẫn khi test từ trình duyệt.",
+      "suggestion": "Sinh servers từ env (ví dụ dùng biến `API_BASE_URL` được chèn vào tài liệu trước khi load) hoặc cung cấp config để override server URL trên môi trường production."
+    },
+    {
+      "severity": "LOW",
+      "file": "src/index.ts",
+      "line": 14,
+      "issue": "`YAML.load(path.join(process.cwd(), 'src/docs/swagger.yaml'))` được gọi đồng bộ ở cấp module. Nếu file thiếu (chạy từ cwd khác) hoặc YAML sai cú pháp, thư viện sẽ throw trong lúc initialize — không đi qua bootstrap catch ở dòng 66, nên không có log rõ ràng.",
+      "impact": "App crash ở startup với stack trace không rõ ràng nếu đường dẫn swagger.yaml không tồn tại (vd: `pnpm start` chạy từ dist với cwd không đúng), khó debug hơn các lỗi đã đi qua errorHandler.",
+      "suggestion": "Bọc load trong try/catch và dùng `logger.error(err, 'Failed to load swagger.yaml')`; ưu tiên import tài liệu như module (vd: `src/docs/swagger.yaml` cùng thư mục) hoặc đặt đường dẫn tuyệt đối theo `import.meta.dirname` thay vì `process.cwd()`."
+    },
+    {
+      "severity": "LOW",
+      "file": "src/index.ts",
+      "line": 57,
+      "issue": "Còn typo `runing` trong log `[server]: Server is runing at http://localhost:${PORT}` (đã chỉ ra ở exercise-03 nhưng chưa sửa).",
+      "impact": "Giảm tính chuyên nghiệp; log sai chính tả khó grep/đánh chỉ số tự động.",
+      "suggestion": "Sửa thành `running`."
+    },
+    {
+      "severity": "LOW",
+      "file": "src/middlewares/requestId.ts",
+      "line": 5,
+      "issue": "Vẫn cast `(req.headers['x-request-id'] as string)` che giấu trường hợp header là `string[]` khi client gửi trùng header, và không sanitize/giới hạn giá trị client gửi lên (giá trị này được in trực tiếp vào morgan log).",
+      "impact": "Nguy cơ log injection khi client gửi request-id chứa ký tự điều khiển/xuống dòng; header dạng mảng cho ra giá trị lạ.",
+      "suggestion": "Xử lý đúng kiểu `string | string[] | undefined` (lấy phần tử đầu, validate regex `[A-Za-z0-9-]{1,64}`, nếu không hợp lệ thì tự sinh UUID), thay vì cast thẳng."
+    },
+    {
+      "severity": "LOW",
+      "file": "src/routes/auth.routes.ts",
+      "line": 7,
+      "issue": "try/catch bao quanh `res.status(200).json(...)` đồng bộ vẫn còn — vô dụng vì `res.json` không throw đồng bộ và Express 5 đã tự bắt lỗi sync handler; thiếu khoảng trắng `res, next`.",
+      "impact": "Code nhiễu, tạo cảm giác sai về nơi cần xử lý lỗi; formatting không khớp Prettier.",
+      "suggestion": "Bỏ try/catch thừa, giữ handler đơn giản, thêm khoảng trắng `res, next` và chạy Prettier."
+    },
+    {
+      "severity": "LOW",
+      "file": "src/middlewares/errorHandler.ts",
+      "line": 27,
+      "issue": "Kiểm tra malformed JSON vẫn dùng cast `(err as any).status` phá vỡ type safety (strict mode đang bật).",
+      "impact": "Vi phạm tinh thần TypeScript strict; nếu body-parser đổi cấu trúc lỗi, compiler không bắt được.",
+      "suggestion": "Dùng type guard hẹp: `err instanceof SyntaxError && (err as SyntaxError & { status?: number }).status === 400` hoặc kiểm tra `(err as { type?: string }).type === 'entity.parse.failed'`."
+    },
+    {
+      "severity": "LOW",
+      "file": "src/index.ts",
+      "line": 37,
+      "issue": "Handler của `/health` và `/ready` được khai báo `async` nhưng không có bất kỳ `await` nào; thêm nữa `/health` không có xử lý lỗi riêng.",
+      "impact": "`async` thừa gây hiểu nhầm rằng có thao tác bất đồng bộ ở đây; ít tác động thực tế nhưng giảm độ rõ ràng.",
+      "suggestion": "Bỏ `async` ở các handler đồng bộ này; với /health không phụ thuộc DB thì giữ như vậy là hợp lý (liveness probe)."
+    },
+    {
+      "severity": "LOW",
+      "file": "src/config/mongo.ts",
+      "line": 14,
+      "issue": "`serverSelectionTimeoutMS: 500` và `socketTimeoutMS: 4500` vẫn hardcode rất thấp.",
+      "impact": "Trên môi trường thật (MongoDB Atlas/EC2) app có thể fail khởi động do timeout quá ngắn vì network latency, gây false-negative readiness.",
+      "suggestion": "Đưa vào env config với default hợp lý (vd: serverSelectionTimeoutMS mặc định 30000) thay vì hardcode."
+    },
+    {
+      "severity": "LOW",
+      "file": "src/index.ts",
+      "line": 1,
+      "issue": "Chưa có graceful shutdown (bắt SIGTERM/SIGINT để đóng server + `mongoose.disconnect()`).",
+      "impact": "Khi container/dịch vụ bị dừng trên EC2/K8s, kết nối MongoDB và socket server không được đóng sạch, có thể gây mất yêu cầu đang xử lý hoặc connection leak.",
+      "suggestion": "Thêm `process.on('SIGTERM'/'SIGINT')` → đóng HTTP server và `mongoose.connection.close()` trước khi exit — bài phù hợp cho checkpoint tiếp theo trước khi deploy."
+    }
+  ],
+  "positives": [
+    "Tích hợp Swagger UI đúng chuẩn với swagger-ui-express + yamljs, phục vụ tại /api-docs, và có file OpenAPI 3.0 (src/docs/swagger.yaml) mô tả đầy đủ /health, /ready, /api/auth/login kèm schema request/response (email format, password minLength).",
+    "Đã sửa theo khuyến nghị exercise-03: `dotenv.config` giờ load file theo NODE_ENV (`path: .env.${NODE_ENV}`), kiểm tra `res.headersSent` đã được đưa lên dòng đầu tiên của errorHandler, và `logger.error(err)` / `logger.error(error, msg)` truyền đúng Error object giữ stack trace.",
+    "Cấu trúc response lỗi nhất quán format `{ error: { code, message, details? } }` (VALIDATION_ERROR, INVALID_JSON, NOT_FOUND, INTERNAL_ERROR) — dễ dùng cho client.",
+    "Phân tách chuẩn liveness (/health không phụ thuộc DB) và readiness (/ready trả 503 khi readyState !== 1) — nền tảng tốt cho deployment probe.",
+    "Bootstrap chuẩn: connect DB trước, listen sau; process.exit(1) chỉ nằm ở bootstrap, không còn trong request handler."
+  ],
+  "checkpoint_status": {
+    "meets_requirements": [
+      "Có Swagger UI (swagger-ui-express) phục vụ tài liệu API tại /api-docs",
+      "Có file OpenAPI 3.0 (src/docs/swagger.yaml) mô tả các endpoint chính /health, /ready, /api/auth/login",
+      "Có schema yêu cầu/response cho login (email format, password minLength) trong tài liệu",
+      "Có phân tách liveness (/health) và readiness (/ready) probe",
+      "dotenv load đúng file theo NODE_ENV"
+    ],
+    "missing_requirements": [],
+    "note": "Đạt yêu cầu trọng tâm bài Swagger/OpenAPI và probes. Các điểm còn lại ở mức MEDIUM/LOW: thứ tự nạp env so với import ESM làm LOG_LEVEL không có hiệu lực, .env.*/dist vẫn bị commit, thiếu script lint/test, typo trong swagger.yaml, cộng các mục LOW tồn đọng từ exercise-03 chưa dọn."
+  },
+  "recommendation_for_mentor": "Học viên đã làm tốt phần tài liệu API bằng Swagger/OpenAPI và các probes /health,/ready — đây là nền tảng quan trọng trước khi deploy. Mentor nên hướng dẫn tiếp: (1) Hiểu rõ thứ tự khởi tạo ESM — dotenv phải chạy trước khi các module đọc env ở module-top (logger bị ảnh hưởng: LOG_LEVEL từ .env.* không được áp dụng); (2) Thực hành git hygiene: thêm .env*/dist vào .gitignore và `git rm --cached` để không commit bí mật, dùng .env.example; (3) Làm script lint + thiết lập Jest/Supertest cho các route hiện có; (4) Chuẩn bị graceful shutdown (SIGTERM/SIGINT + đóng mongoose) trước khi tiến tới container hóa với Docker; (5) Nhắc học viên dọn các LOW tồn đọng (typo runing, requestId cast/log injection, try/catch thừa ở auth.routes, any-cast trong errorHandler) vì chúng đã được nêu từ 2 bài trước."
+}
