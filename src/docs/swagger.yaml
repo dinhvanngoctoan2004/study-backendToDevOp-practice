@@ -2,31 +2,31 @@ openapi: 3.0.0
 info:
   title: Practice Backend API
   version: 1.0.0
-  description: Tài liệu API REST cho dự án study-backendToDevOp-practice
+  description: REST API documentation for the study-backendToDevOp-practice project
 servers:
   - url: http://localhost:3000
-    description: Local Developmen server
+    description: Local Development Server
 
 paths:
   /health:
     get:
-      summary: kiểm tra trạng thái sông của server (Liveness probe)
+      summary: Check server health status (Liveness probe)
       responses:
         '200':
-          description: server đang chạy bình thường.
+          description: Server is running normally
 
   /ready:
     get:
-      summary: kiểm tra sẳn sàng phục vụ trafic
+      summary: Check readiness to serve traffic
       responses:
         '200':
-          description: các dependecy (đã sẵn sàng)
+          description: All dependencies are ready
         '503':
-          description: dependecy bị lỗi kết nối
+          description: Dependency connection error
 
   /api/auth/login:
     post:
-      summary: Đăng nhập hệ thống
+      summary: System login
       requestBody:
         required: true
         content:
@@ -47,8 +47,8 @@ paths:
                   example: 123456
       responses:
         '200':
-          description: Đăng nhập thành công
+          description: Login successful
         '400':
-          description: lỗi validation dữ liệu đầu vào hoặc json sai định dạng
+          description: Input validation error or malformed JSON payload
         '500':
-          description: Lỗi hệ thống nội bộ
+          description: Internal server error

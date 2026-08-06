@@ -1,5 +1,4 @@
-import dotenv from 'dotenv';
-dotenv.config({path:`.env.${process.env.NODE_ENV || 'development'}`});
+import './config/env.js'
 import express, { type Request, type Response } from 'express';
 import { connectMongo } from './config/mongo.js';
 import mongoose from 'mongoose';
