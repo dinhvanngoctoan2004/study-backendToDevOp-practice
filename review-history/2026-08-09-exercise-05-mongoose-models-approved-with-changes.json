@@ -1,0 +1,203 @@
+{
+  "review_metadata": {
+    "date": "2026-08-09",
+    "exercise": "Bước 5 — Mongoose Models: User & Event + tách env config",
+    "phase": "Backend - MongoDB models (User, Event)",
+    "commit_hash": "a918d9d",
+    "files_reviewed": [
+      "src/models/User.ts",
+      "src/models/Event.ts",
+      "src/config/env.ts",
+      "src/config/logger.ts",
+      "src/config/mongo.ts",
+      "src/index.ts",
+      "src/middlewares/errorHandler.ts",
+      "src/middlewares/requestId.ts",
+      "src/middlewares/validate.ts",
+      "src/routes/auth.routes.ts",
+      "src/schemas/validation.ts",
+      "src/docs/swagger.yaml",
+      "package.json",
+      ".gitignore",
+      "tsconfig.json"
+    ]
+  },
+  "overall_score": 7.5,
+  "verdict": "APPROVED_WITH_CHANGES",
+  "critical_issues": [],
+  "improvements": [
+    {
+      "severity": "MEDIUM",
+      "file": "src/models/Event.ts",
+      "line": 24,
+      "issue": "Interface `IEvent` khai báo `updateAt: Date` (thiếu chữ 'd') trong khi `timestamps: true` ở dòng 53 tạo field thật là `updatedAt`. Ngược lại, field `updatedAt` thật lại không có trong interface.",
+      "impact": "Type 'lie': `event.updateAt` được typed là Date nhưng luôn là `undefined` ở runtime (TS không bắt được), còn `event.updatedAt` — field thật — không bao giờ truy cập được với type safety. Gây bug khó lần khi sort/filter theo thời gian cập nhật.",
+      "suggestion": "Sửa thành `updatedAt: Date` (hoặc bỏ hẳn khai báo vì mongoose tự thêm khi dùng `timestamps: true`). Cân nhắc dùng `InferSchemaType<typeof eventSchema>` thay cho interface thủ công để type luôn khớp schema."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "src/models/Event.ts",
+      "line": 30,
+      "issue": "Thiếu cross-field validation: `availableQuantity` (min 0) và `totalQuantity` (min 1) được validate riêng lẻ nên không chặn được `availableQuantity > totalQuantity`; tương tự `endTime` (dòng 45) có thể nhỏ hơn hoặc bằng `startTime` (dòng 44).",
+      "impact": "Event có thể được lưu với trạng thái vô lý: số vé 'còn lại' nhiều hơn tổng vé (phá vỡ logic đặt vé sau này), hoặc event kết thúc trước khi bắt đầu — dữ liệu bẩn đi vào DB ngay từ tầng model.",
+      "suggestion": "Thêm `userSchema.pre('validate', ...)` so sánh 2 field (ném lỗi nếu vi phạm) hoặc validate ở service layer bằng Zod trước khi lưu. Ví dụ: `eventSchema.pre('validate', function () { if (this.availableQuantity > this.totalQuantity) this.invalidate('availableQuantity', 'must be <= totalQuantity'); if (this.endTime <= this.startTime) this.invalidate('endTime', 'must be after startTime'); })`."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "src/models/User.ts",
+      "line": 31,
+      "issue": "Pre-save hook bcrypt chỉ chạy khi document được lưu qua `save()`. Các method `updateOne()`, `findOneAndUpdate()`, `findByIdAndUpdate()` (thường dùng để đổi mật khẩu/role) bỏ qua hook này.",
+      "impact": "Nếu sau này team đổi mật khẩu qua query update, password plaintext sẽ bị lưu thẳng vào DB — lỗ hổng bảo mật thực tế, đặc biệt nguy hiểm vì `select: false` tạo cảm giác 'đã an toàn'.",
+      "suggestion": "Hoặc thêm `userSchema.pre('findOneAndUpdate', ...)` hash `this.getUpdate().password`, hoặc (khuyến nghị) đặt quy ước rõ: mọi thay đổi password phải qua `user.save()` sau khi set field; ghi chú điều này vào code/service để người sau không vô tình vi phạm."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "package.json",
+      "line": 15,
+      "issue": "`devEngines.packageManager.version` khai báo range `\"^11.8.0\"` — corepack chỉ chấp nhận version chính xác. Khi chạy `pnpm` ở môi trường dùng corepack, lệnh fail ngay với 'Invalid package manager specification in package.json (pnpm@^11.8.0); expected a semver version' (đã xác minh được).",
+      "impact": "Developer/CI dùng corepack (chuẩn của Node.js) không chạy được bất kỳ lệnh pnpm nào — chặn cả `pnpm install`, `pnpm dev`, `pnpm build`.",
+      "suggestion": "Đổi thành version chính xác `\"11.8.0\"`, hoặc bỏ field này và thêm `\"packageManager\": \"pnpm@11.8.0\"` (corepack đọc field `packageManager`, phải là version chính xác)."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "package.json",
+      "line": 10,
+      "issue": "Tồn đọng từ exercise-03/exercise-04 chưa xử lý: không có script `lint` (README vẫn document `pnpm lint`), script `test` vẫn là placeholder `echo \"Error: no test specified\" && exit 1`, và `.eslintrc.json` (legacy config) vẫn nằm trong repo trong khi ESLint 10 chỉ đọc `eslint.config.js` (flat).",
+      "impact": "Không có baseline test/lint chạy được bằng lệnh chuẩn — các bài tiếp theo (repository/service, CI/CD) sẽ thiếu nền tảng kiểm tra tự động.",
+      "suggestion": "Thêm `\"lint\": \"eslint src --max-warnings 0\"`, xóa `.eslintrc.json`, và thiết lập Jest + Supertest (bao gồm test cho User/Event model: hash password khi save, unique email) trước khi sang bước repository/service."
+    },
+    {
+      "severity": "LOW",
+      "file": "src/routes/auth.routes.ts",
+      "line": 7,
+      "issue": "Endpoint `/api/auth/login` vẫn là stub trả `{ message: 'Login success' }` cho mọi request hợp lệ về format — không đối chiếu credential, không dùng User model mới tạo; đồng thời model chưa có method `comparePassword`.",
+      "impact": "Hiện tại login 'thành công' kể cả khi email không tồn tại / sai mật khẩu. Nếu phạm vi bước 5 chỉ là models thì chấp nhận được (auth thật thường ở bài JWT), nhưng cần xác nhận để không nhầm là đã hoàn thành luồng đăng nhập.",
+      "suggestion": "Ở bài auth tiếp theo: thêm `comparePassword` vào model, đưa logic vào service layer, trả 401 khi sai credential, và xử lý lỗi duplicate key (E11000) của email unique thành 409 thay vì rơi vào INTERNAL_ERROR 500."
+    },
+    {
+      "severity": "LOW",
+      "file": "src/index.ts",
+      "line": 63,
+      "issue": "Typo `runing` vẫn còn trong log `[server]: Server is runing at ...` — đã được nêu ở exercise-03 và exercise-04 nhưng chưa sửa.",
+      "impact": "Log sai chính tả khó grep, giảm tính chuyên nghiệp.",
+      "suggestion": "Sửa thành `running`."
+    },
+    {
+      "severity": "LOW",
+      "file": "src/index.ts",
+      "line": 29,
+      "issue": "Handler `/health` (dòng 29) và `/ready` (dòng 36) vẫn khai báo `async` nhưng không có bất kỳ `await` nào (tồn đọng từ exercise-04).",
+      "impact": "Gây hiểu nhầm có thao tác bất đồng bộ; không ảnh hưởng hành vi nhưng giảm độ rõ ràng.",
+      "suggestion": "Bỏ `async` ở hai handler đồng bộ này."
+    },
+    {
+      "severity": "LOW",
+      "file": "src/middlewares/requestId.ts",
+      "line": 5,
+      "issue": "Vẫn cast `(req.headers['x-request-id'] as string)` — không xử lý header dạng `string[]` (client gửi trùng header) và không sanitize/giới hạn giá trị client gửi lên, giá trị này được in trực tiếp vào morgan log (tồn đọng từ exercise-03/04).",
+      "impact": "Nguy cơ log injection khi request-id chứa ký tự điều khiển/xuống dòng.",
+      "suggestion": "Xử lý đúng kiểu `string | string[] | undefined` (lấy phần tử đầu), validate regex `[A-Za-z0-9-]{1,64}`, không hợp lệ thì tự sinh UUID thay vì cast thẳng."
+    },
+    {
+      "severity": "LOW",
+      "file": "src/middlewares/errorHandler.ts",
+      "line": 26,
+      "issue": "Vẫn dùng `(err as any).status` trong điều kiện nhận diện malformed JSON (tồn đọng từ exercise-03/04). Điểm tích cực: đã thêm được `'body' in err` nên điều kiện chặt hơn.",
+      "impact": "Cast `any` phá vỡ type safety của strict mode; nếu body-parser đổi cấu trúc lỗi, compiler không bắt được.",
+      "suggestion": "Dùng type guard hẹp: `err instanceof SyntaxError && (err as SyntaxError & { status?: number }).status === 400 && 'body' in err`."
+    },
+    {
+      "severity": "LOW",
+      "file": "src/routes/auth.routes.ts",
+      "line": 6,
+      "issue": "try/catch bao quanh `res.status(200).json(...)` đồng bộ vẫn còn (tồn đọng từ exercise-03/04) — `res.json` không throw đồng bộ và Express 5 đã tự bắt lỗi sync handler.",
+      "impact": "Code nhiễu, tạo cảm giác sai về nơi cần xử lý lỗi.",
+      "suggestion": "Bỏ try/catch thừa, giữ handler đơn giản."
+    },
+    {
+      "severity": "LOW",
+      "file": "src/config/mongo.ts",
+      "line": 10,
+      "issue": "`serverSelectionTimeoutMS: 500` và `socketTimeoutMS: 4500` vẫn hardcode rất thấp (tồn đọng từ exercise-03/04).",
+      "impact": "Trên môi trường thật (MongoDB Atlas/EC2) app có thể fail khởi động do network latency, gây false-negative readiness.",
+      "suggestion": "Đưa vào env config với default hợp lý (vd: serverSelectionTimeoutMS mặc định 30000)."
+    },
+    {
+      "severity": "LOW",
+      "file": "src/index.ts",
+      "line": 21,
+      "issue": "`YAML.load(...)` đồng bộ ở cấp module, không try/catch (tồn đọng từ exercise-04); thêm nữa server không giữ tham chiếu `app.listen()` nên chưa thể graceful shutdown (SIGTERM/SIGINT + đóng mongoose).",
+      "impact": "Crash startup khó debug nếu thiếu/định dạng sai swagger.yaml; khi dừng container trên EC2/K8s, kết nối không được đóng sạch.",
+      "suggestion": "Bọc load trong try/catch với `logger.error`; thêm `process.on('SIGTERM'/'SIGINT')` đóng HTTP server và `mongoose.connection.close()` — phù hợp cho bước trước khi container hóa."
+    },
+    {
+      "severity": "LOW",
+      "file": "src/config/mongo.ts",
+      "line": 17,
+      "issue": "Log trùng: `connectMongo()` log 'MongoDB Connected successfully' và bootstrap trong `src/index.ts:50` log 'Database connected successfully' cho cùng một sự kiện.",
+      "impact": "Nhiễu log, khó theo dõi sự kiện kết nối khi grep.",
+      "suggestion": "Chỉ log một nơi — nên để ở `connectMongo()` (nơi sự kiện xảy ra)."
+    },
+    {
+      "severity": "LOW",
+      "file": "src/config/env.ts",
+      "line": 2,
+      "issue": "`dotenv.config()` không kiểm tra lỗi (file env thiếu vẫn pass âm thầm) và chưa validate env vars bằng Zod — dù stack đã có Zod từ trước.",
+      "impact": "Sai sót cấu hình (thiếu MONGO_URI, PORT không phải số) chỉ bị phát hiện muộn ở tầng connect/startup, không phải ngay lúc khởi động app.",
+      "suggestion": "Tạo schema Zod `envSchema` (PORT, MONGO_URI, LOG_LEVEL, NODE_ENV) và `safeParse` ngay trong `env.ts`, log rõ biến nào thiếu rồi `process.exit(1)` nếu sai."
+    },
+    {
+      "severity": "LOW",
+      "file": "src/models/Event.ts",
+      "line": 38,
+      "issue": "Không có index cho `organizerId` — chỉ có index của `slug` (unique). Query 'danh sách event của organizer X' (thao tác phổ biến nhất của nền tảng sự kiện) sẽ phải full-scan khi collection lớn.",
+      "impact": "Hiệu năng truy vấn giảm khi dữ liệu tăng; chưa ảnh hưởng ở giai đoạn này.",
+      "suggestion": "Thêm `eventSchema.index({ organizerId: 1, startTime: -1 })` cho pattern query sự kiện theo organizer sắp theo thời gian."
+    },
+    {
+      "severity": "LOW",
+      "file": "src/models/Event.ts",
+      "line": 15,
+      "issue": "`price` kiểu `Number` (float) — tiền tệ lưu dạng số thập phân dễ gặp lỗi làm tròn floating-point khi tính tổng/so sánh.",
+      "impact": "Sai số tiền trong các phép toán vé về lâu dài; ở giai đoạn này chỉ là rủi ro tiềm ẩn.",
+      "suggestion": "Lưu theo đơn vị nhỏ nhất (cent/VND) dạng integer, hoặc dùng `Decimal128` của MongoDB; thống nhất quy ước ngay từ model."
+    },
+    {
+      "severity": "LOW",
+      "file": "src/docs/swagger.yaml",
+      "line": 8,
+      "issue": "`servers[].url` vẫn hardcode `http://localhost:3000` (tồn đọng từ exercise-04).",
+      "impact": "Khi deploy lên EC2 (roadmap), Swagger UI vẫn trỏ về localhost của máy người xem — nút 'Try it out' gửi request sai địa chỉ.",
+      "suggestion": "Sinh server URL từ env (`API_BASE_URL`) trước khi load tài liệu, hoặc override theo môi trường."
+    },
+    {
+      "severity": "LOW",
+      "file": "package.json",
+      "line": 14,
+      "issue": "`pnpm install` báo `ERR_PNPM_IGNORED_BUILDS: Ignored build scripts: bcrypt@6.0.0` — pnpm 10+ chặn postinstall mặc định, chưa khai báo `onlyBuiltDependencies`. (Trong môi trường review này binding bcrypt vẫn hoạt động nhờ prebuilt, nhưng không đảm bảo trên mọi platform/CI image.)",
+      "impact": "CI/docker build có thể fail runtime nếu binding native của bcrypt không được tải/built; đồng thời lệnh install luôn in cảnh báo.",
+      "suggestion": "Thêm vào package.json: `\"pnpm\": { \"onlyBuiltDependencies\": [\"bcrypt\"] }` (hoặc chạy `pnpm approve-builds`) và kiểm tra trên CI image."
+    }
+  ],
+  "positives": [
+    "Build sạch: `tsc` pass với strict mode + noUncheckedIndexedAccess + exactOptionalPropertyTypes + verbatimModuleSyntax, và ESLint (flat config) không lỗi — chất lượng TypeScript tốt.",
+    "Đã fix đúng MEDIUM của exercise-04: `import './config/env.js'` được đặt làm import đầu tiên trong src/index.ts nên env được nạp trước khi logger đọc LOG_LEVEL — vấn đề thứ tự khởi tạo ESM đã hết.",
+    "Đã fix đúng MEDIUM của exercise-04: .gitignore giờ có `node_modules`, `.env*` và `dist/`; `git ls-files` xác nhận không còn file .env nào được track.",
+    "User model làm đúng các chuẩn bảo mật cơ bản: password `select: false` (không leak hash khi query), bcrypt hash trong pre('save') với salt rounds 10, email unique + lowercase + trim, role enum với default 'customer'.",
+    "Event model có cấu trúc rõ ràng: slug unique, organizerId ref 'User', location gom nhóm, ticketCategories là subdocument có ràng buộc min, status enum với default 'draft', timestamps.",
+    "Các typo trong swagger.yaml của exercise-04 đã được dọn sạch; tài liệu giờ mô tả tiếng Anh chuẩn.",
+    "errorHandler đã chặt hơn exercise-04: điều kiện malformed JSON giờ thêm `'body' in err`; formatting `res, next` trong auth.routes đã chuẩn Prettier."
+  ],
+  "checkpoint_status": {
+    "meets_requirements": [
+      "Định nghĩa User model trong src/models/User.ts: email unique/lowercase/trim, password bcrypt hash khi save, role enum ('customer'|'organizer'|'admin') có default, profile (fullName required, phone/avatar optional), timestamps",
+      "Định nghĩa Event model trong src/models/Event.ts: title, slug unique/lowercase, organizerId ref 'User', location, startTime/endTime, ticketCategories subdocument, status enum có default 'draft', timestamps",
+      "Password được ẩn mặc định khỏi kết quả query (select: false)",
+      "Tách env config thành module riêng (src/config/env.ts) và được nạp trước mọi module khác",
+      "Build TypeScript strict và ESLint pass"
+    ],
+    "missing_requirements": [],
+    "note": "Repo không chứa spec checkpoint chính thức cho bước 5 (chỉ có commit 'bước 5'), nên danh sách trên ước lượng theo các file mới (models + env config). Nếu yêu cầu thật còn bao gồm 'login dùng model thật' hoặc 'test cho models', cần bổ sung — mentor nên xác nhận phạm vi. Không có critical issue; các điểm còn lại ở mức MEDIUM/LOW, trong đó có 2 MEDIUM chưa xử lý từ exercise-03/04 (lint/test script, .eslintrc.json legacy) và phát hiện mới: devEngines.packageManager dùng range làm corepack không chạy được pnpm."
+  },
+  "recommendation_for_mentor": "Học viên đã hoàn thành tốt phần Mongoose models (User, Event) và tách env config — đúng hướng cho F3-DevTalk. Mentor nên hướng dẫn tiếp theo thứ tự ưu tiên: (1) Cross-field validation cho Event (availableQuantity <= totalQuantity, endTime > startTime) — đây là bài học quan trọng về data integrity ở tầng model, dùng pre('validate') hoặc service layer; (2) Nối models vào luồng thật: register/login dùng User model, thêm comparePassword, xử lý lỗi E11000 duplicate key → 409, và nhấn mạnh quy ước 'đổi mật khẩu chỉ qua save()' vì pre-save hook không chạy với findOneAndUpdate/updateOne; (3) Sửa ngay devEngines.packageManager (range ^11.8.0) vì corepack chặn pnpm chạy — ảnh hưởng trực tiếp developer và CI; (4) Dọn 2 MEDIUM tồn đọng: thêm script lint, bỏ .eslintrc.json legacy, thiết lập Jest/Supertest (test models: hash password, unique email) trước bước repository/service; (5) Nhắc học viên dọn các LOW tồn đọng đã nêu từ 2-3 bài trước (typo runing, requestId cast/log injection, any-cast trong errorHandler, try/catch thừa ở auth.routes, mongo timeout hardcode, YAML.load không try/catch, servers url hardcode, graceful shutdown) — việc để tồn đọng kéo dài làm review lặp lại cùng nội dung; (6) Gợi ý nhỏ: index organizerId + startTime cho Event và cân nhắc lưu price dạng số nguyên đơn vị nhỏ."
+}
