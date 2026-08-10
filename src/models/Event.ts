@@ -21,7 +21,7 @@ export interface IEvent extends Document {
   ticketCategories: ITicketCategory[];
   status: 'draft' | 'published' | 'completed' | 'cancelled';
   createdAt: Date;
-  updateAt: Date;
+  updatedAt: Date;
 }
 
 const ticketCategorySchema = new Schema<ITicketCategory>({
@@ -52,4 +52,10 @@ const eventSchema = new Schema<IEvent>(
   },
   { timestamps: true },
 );
+
+eventSchema.pre('validate', function () {
+  if (this.endTime <= this.startTime) {
+    this.invalidate('endTime', 'endTime must be greater than startTime');
+  }
+});
 export const Event = model<IEvent>('Event', eventSchema);
