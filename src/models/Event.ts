@@ -58,4 +58,6 @@ eventSchema.pre('validate', function () {
     this.invalidate('endTime', 'endTime must be greater than startTime');
   }
 });
+
+eventSchema.index({ organizerId: 1, startTime: -1 });
 export const Event = model<IEvent>('Event', eventSchema);

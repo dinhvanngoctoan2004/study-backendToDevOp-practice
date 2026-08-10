@@ -16,6 +16,11 @@
     "packageManager": "pnpm@11.8.0"
   },
   "type": "module",
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "bcrypt"
+    ]
+  },
   "dependencies": {
     "bcrypt": "^6.0.0",
     "dotenv": "^17.4.2",
