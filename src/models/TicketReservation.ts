@@ -30,9 +30,15 @@ const TicketReservationSchema = new Schema<ITicketReservation>(
 );
 
 //TTL Index: Tự động hết hạn/xóa vé giữ chỗ khi tới mốc heldUntil
-TicketReservationSchema.index({ heldUntil: 1 }, { expireAfterSeconds: 0 });
+TicketReservationSchema.index(
+  { heldUntil: 1 },
+  { expireAfterSeconds: 0, partialFilterExpression: { status: 'held' } },
+);
 // Unique Compound Index: Đảm bảo trong 1 sự kiện KHÔNG BAO GIỜ có 2 người giữ trùng số ghế
-TicketReservationSchema.index({ eventId: 1, seatNumber: 1 }, { unique: true });
+TicketReservationSchema.index(
+  { eventId: 1, seatNumber: 1 },
+  { unique: true, partialFilterExpression: { status: { $in: ['held', 'confirmed'] } } },
+);
 
 export const TicketReservation = model<ITicketReservation>(
   'TicketReservation',

@@ -15,7 +15,7 @@ export class AuthService {
 
     if (!check2) throw new AppError(401, 'UNAUTHORIZED', 'Incorrect login information');
 
-    const { password: password, ...safeUser } = check.toObject();
+    const { password: _password, ...safeUser } = check.toObject();
     return safeUser;
   }
 }
