@@ -7,7 +7,7 @@ class AuthController {
   async login(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const user = req.body;
-      const resul = await authService.login(user);
+      const resul = await this.authServ.login(user);
       res.status(200).json({
         status: 'success',
         data: resul,

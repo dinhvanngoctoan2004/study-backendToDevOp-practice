@@ -9,13 +9,14 @@ export class AuthService {
   async login(input: LoginInput) {
     const check = await this.userRepo.findByEmail(input.email);
 
-    if (!check) throw new AppError(400, 'UNAUTHORIZED', 'Incorrect login information');
+    if (!check) throw new AppError(401, 'UNAUTHORIZED', 'Incorrect login information');
 
     const check2 = await bcrypt.compare(input.password, check.password!);
 
-    if (!check2) throw new AppError(400, 'UNAUTHORIZED', 'Incorrect login information');
+    if (!check2) throw new AppError(401, 'UNAUTHORIZED', 'Incorrect login information');
 
-    return check2;
+    const { password: password, ...safeUser } = check.toObject();
+    return safeUser;
   }
 }
 
