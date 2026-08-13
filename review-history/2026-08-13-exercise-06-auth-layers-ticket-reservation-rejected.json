@@ -1,0 +1,158 @@
+{
+  "review_metadata": {
+    "date": "2026-08-13",
+    "exercise": "Bước 6 — Repository + Service + Controller (Auth login thật) + TicketReservation model + Analytics aggregation",
+    "phase": "Backend - Layered architecture, real login, reservation model, MongoDB aggregation",
+    "commit_hash": "4c0f3ee",
+    "files_reviewed": [
+      "src/controllers/auth.controller.ts",
+      "src/services/auth.service.ts",
+      "src/repositories/user.repository.ts",
+      "src/repositories/analytics.repository.ts",
+      "src/models/TicketReservation.ts",
+      "src/models/User.ts",
+      "src/models/Event.ts",
+      "src/routes/auth.routes.ts",
+      "src/schemas/validation.ts",
+      "src/middlewares/errorHandler.ts",
+      "src/middlewares/validate.ts",
+      "src/middlewares/requestId.ts",
+      "src/config/env.ts",
+      "src/config/logger.ts",
+      "src/config/mongo.ts",
+      "src/index.ts",
+      "src/docs/swagger.yaml",
+      "package.json",
+      "eslint.config.js",
+      ".eslintrc.json"
+    ]
+  },
+  "overall_score": 6.0,
+  "verdict": "REJECTED",
+  "critical_issues": [
+    {
+      "severity": "CRITICAL",
+      "file": "src/models/TicketReservation.ts",
+      "line": 33,
+      "issue": "TTL index `{ heldUntil: 1 }, { expireAfterSeconds: 0 }` xóa MỌI document khi `heldUntil` đã qua — không phân biệt `status`. `heldUntil` lại là `required: true` (dòng 26) nên vé `confirmed` / `cancelled` cũng bắt buộc có field này và sẽ bị MongoDB TTL monitor xóa (chu kỳ ~60s).",
+      "impact": "Mất dữ liệu vé đã thanh toán: sau mốc `heldUntil`, reservation `confirmed` biến mất. Hệ quả kép: mất lịch sử doanh thu/analytics, và ghế đó có thể bị bán lại (double-sell) vì document không còn. Enum có `expired` nhưng TTL không bao giờ set status — nó xóa hẳn document.",
+      "suggestion": "TTL chỉ được áp dụng cho vé đang hold. Làm `heldUntil` optional (chỉ có khi `status === 'held'`), và thêm partial filter. Ví dụ: `TicketReservationSchema.index({ heldUntil: 1 }, { expireAfterSeconds: 0, partialFilterExpression: { status: 'held' } })`. Khi confirm thì unset `heldUntil`. Cách bền hơn: không xóa document — job định kỳ đổi `held` quá hạn thành `expired` để giữ audit trail."
+    },
+    {
+      "severity": "HIGH",
+      "file": "src/models/TicketReservation.ts",
+      "line": 35,
+      "issue": "Unique compound index `{ eventId: 1, seatNumber: 1 }` không có `partialFilterExpression`. Mọi reservation (kể cả `cancelled` / `expired`) đều chiếm slot unique của cặp event+ghế.",
+      "impact": "Hủy vé xong không bán lại được ghế đó cho đến khi document bị xóa. Nếu sửa CRITICAL TTL (giữ lại confirmed/cancelled) mà không sửa index này, ghế cancelled bị khóa vĩnh viễn — luồng đặt vé cốt lõi gãy.",
+      "suggestion": "Unique chỉ cho reservation đang chiếm ghế: `TicketReservationSchema.index({ eventId: 1, seatNumber: 1 }, { unique: true, partialFilterExpression: { status: { $in: ['held', 'confirmed'] } } })`. Document `cancelled`/`expired` không tham gia unique → ghế được mở bán lại, vẫn giữ lịch sử."
+    }
+  ],
+  "improvements": [
+    {
+      "severity": "MEDIUM",
+      "file": "src/services/auth.service.ts",
+      "line": 18,
+      "issue": "ESLint fail trên code mới: `'password' is assigned a value but never used` vì `const { password: password, ...safeUser } = check.toObject()`. Đã xác minh `pnpm exec eslint src` exit 1. Đồng thời `check.password!` (dòng 13) dùng non-null assertion — nếu document không có hash (quên `select('+password')` hoặc data bẩn) thì `bcrypt.compare` throw và rơi 500 INTERNAL_ERROR.",
+      "impact": "Không có baseline lint sạch cho bài này; lỗi thiếu password bị biến thành 500 thay vì 401 có kiểm soát.",
+      "suggestion": "Omit bằng rest không gán biến thừa: `const { password: _ignored, ...safeUser } = check.toObject()` (và thêm `varsIgnorePattern: '^_'` nếu cần). Trước compare, nếu `typeof check.password !== 'string'` thì `throw new AppError(401, 'UNAUTHORIZED', 'Incorrect login information')`."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "src/repositories/user.repository.ts",
+      "line": 3,
+      "issue": "UserRepository chỉ có `findByEmail`. Không có `create`/register; không có route `POST /api/auth/register`. Login thật đã nối User model nhưng không có cách tạo user qua API (mentor đã yêu cầu register+login từ exercise-05).",
+      "impact": "Không test được login end-to-end trừ khi insert tay vào Mongo. Thiếu chỗ xử lý E11000 duplicate email → 409 — đúng bài học đi kèm unique index.",
+      "suggestion": "Thêm `create(data)` trong repository, schema Zod register (email, password, profile.fullName), service ném `AppError(409, 'CONFLICT', ...)` khi catch E11000, controller + route `POST /register`. Giữ hash nhờ pre('save'), không hash thêm ở service."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "src/repositories/analytics.repository.ts",
+      "line": 8,
+      "issue": "`new Types.ObjectId(eventId)` ném BSONError nếu `eventId` không phải 24-hex. Hàm cũng trả `null` vừa khi event không có reservation nào, vừa khi event không tồn tại — caller không phân biệt được.",
+      "impact": "Khi gắn vào route, input sai → 500 thay vì 400. Client không biết 'chưa có vé' hay 'event không tồn tại'.",
+      "suggestion": "Validate bằng `Types.ObjectId.isValid(eventId)` (và đủ 24 ký tự hex) rồi mới `new Types.ObjectId`. Cân nhắc `$facet` hoặc lookup event trước: không thấy event thì null/404; có event nhưng không vé thì trả `totalRevenue: 0` + count 0."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "src/models/Event.ts",
+      "line": 30,
+      "issue": "Tồn đọng exercise-05: `pre('validate')` (dòng 56) chỉ so `endTime > startTime`, chưa chặn `availableQuantity > totalQuantity` trên từng phần tử `ticketCategories`.",
+      "impact": "Event vẫn lưu được trạng thái vô lý (còn lại nhiều hơn tổng vé) — phá inventory khi viết booking service ngay sau bài này.",
+      "suggestion": "Trong cùng `pre('validate')`, duyệt `this.ticketCategories` và `invalidate` nếu `availableQuantity > totalQuantity`."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "package.json",
+      "line": 15,
+      "issue": "`devEngines.packageManager` là string `\"pnpm@11.8.0\"`. Đã xác minh: npm 10+/Node 22 fail ngay `Invalid non-object value for \"packageManager\"` (không install/build được bằng npm); corepack cảnh báo và bỏ qua field. `pnpm.onlyBuiltDependencies` (dòng 20) cũng bị pnpm 11 ignore (`The \"pnpm\" field in package.json is no longer read`).",
+      "impact": "Developer dùng npm không chạy được project. Cảnh báo corepack/pnpm mỗi lệnh. bcrypt native build vẫn không được approve chính thức trên CI image.",
+      "suggestion": "Đổi `devEngines.packageManager` thành object `{ \"name\": \"pnpm\", \"version\": \"11.8.0\" }` và thêm field top-level `\"packageManager\": \"pnpm@11.8.0\"` cho corepack. Chuyển `onlyBuiltDependencies` sang `pnpm-workspace.yaml` (cấu hình pnpm 11)."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "package.json",
+      "line": 10,
+      "issue": "Tồn đọng từ exercise-03/04/05: không có script `lint` (README vẫn ghi `pnpm lint`), `test` vẫn là placeholder `exit 1`, `.eslintrc.json` legacy còn song song `eslint.config.js`.",
+      "impact": "Không có lệnh chuẩn để chặn lỗi như unused `password` vừa phát hiện; bài repository/service thiếu test (login 401, bcrypt, aggregation).",
+      "suggestion": "Thêm `\"lint\": \"eslint src --max-warnings 0\"`, xóa `.eslintrc.json`, dựng Jest + Supertest: login sai/đúng credential, password không lộ trong JSON, ObjectId analytics invalid → 400."
+    },
+    {
+      "severity": "LOW",
+      "file": "src/services/auth.service.ts",
+      "line": 9,
+      "issue": "Tên biến không nói ý nghĩa: `check` / `check2` (service), `resul` (controller dòng 9), `user` cho login payload. Throw 401 trước `bcrypt.compare` khi email không tồn tại — timing khác với nhánh sai mật khẩu.",
+      "impact": "Khó đọc; `resul` là typo. Timing difference cho phép dò email tồn tại (rủi ro nhỏ ở giai đoạn này).",
+      "suggestion": "Đổi thành `user` / `isMatch` / `result`. Muốn chống enumeration: luôn `bcrypt.compare` với hash dummy khi không thấy user, rồi mới ném 401."
+    },
+    {
+      "severity": "LOW",
+      "file": "src/docs/swagger.yaml",
+      "line": 50,
+      "issue": "Login giờ trả 401 `UNAUTHORIZED` và body `{ status, data: safeUser }` nhưng Swagger chỉ có 200/400/500, không mô tả 401 hay response schema.",
+      "impact": "Tài liệu lệch hành vi thật — 'Try it out' không cho client biết contract lỗi đăng nhập.",
+      "suggestion": "Thêm response `401` và schema 200 (`id`, `email`, `role`, `profile`, không có `password`)."
+    },
+    {
+      "severity": "LOW",
+      "file": "src/models/TicketReservation.ts",
+      "line": 17,
+      "issue": "Không có index `{ userId: 1, createdAt: -1 }` cho query 'vé của tôi'. `getEventAnalytics` là function export, không cùng style class như `UserRepository`, và chưa được nối route/controller.",
+      "impact": "Query theo user sẽ full-scan khi dữ liệu lớn; layer analytics chưa đồng nhất, chưa gọi được qua HTTP.",
+      "suggestion": "Thêm index userId+createdAt. Gói aggregation vào class `AnalyticsRepository` cho đồng bộ. Route analytics để bài sau cũng được — ghi rõ phạm vi."
+    },
+    {
+      "severity": "LOW",
+      "file": "src/index.ts",
+      "line": 63,
+      "issue": "Các LOW tồn đọng đã nêu từ exercise-03/04/05 vẫn còn: typo `runing`; `/health` `/ready` `async` không `await`; `requestId` cast `as string` không sanitize (log injection); `(err as any).status` trong errorHandler; `serverSelectionTimeoutMS: 500` hardcode; `YAML.load` không try/catch; swagger `servers[].url` hardcode localhost; chưa graceful shutdown; `env.ts` chưa Zod-validate.",
+      "impact": "Review lặp lại cùng nội dung 3–4 bài; nợ kỹ thuật chồng khi sắp sang booking/JWT/Docker.",
+      "suggestion": "Dọn một commit riêng trước bài JWT/booking: sửa typo, bỏ `async` thừa, sanitize request-id, type guard hẹp cho SyntaxError, timeout Mongo đưa vào env, bọc YAML.load, SIGTERM đóng server + mongoose."
+    }
+  ],
+  "positives": [
+    "Tách layer đúng cấu trúc README: route → controller → service → repository. Route bọc `(req, res, next) => authController.login(...)` nên không mất `this`. Constructor inject singleton — dễ fake repository khi viết test.",
+    "Login đã là luồng thật: `findByEmail` + `select('+password')`, `bcrypt.compare`, cùng message 401 cho email sai và mật khẩu sai (không lộ user tồn tại qua nội dung lỗi), `toObject()` rồi tách `password` khỏi response.",
+    "`tsc --noEmit` pass với strict + noUncheckedIndexedAccess + exactOptionalPropertyTypes + verbatimModuleSyntax.",
+    "TicketReservation có domain rõ: ref Event/User, enum status, `price` lưu trên reservation (đúng: giá lịch sử không bị event đổi giá làm lệch), comment giải thích ý định TTL và unique seat.",
+    "Analytics pipeline đọc được: `$match` → `$group` với `$cond` theo status → `$lookup` events → `$project`. 1 document = 1 ghế nên `$sum: '$price'` khớp model.",
+    "Đã tiếp thu một phần exercise-05: `IEvent.updatedAt` đúng chính tả, `pre('validate')` cho `endTime > startTime`, index `{ organizerId: 1, startTime: -1 }`, `loginSchema` có `trim().toLowerCase()`, `pnpm.onlyBuiltDependencies` (dù pnpm 11 không còn đọc field này)."
+  ],
+  "checkpoint_status": {
+    "meets_requirements": [
+      "Có AuthController / AuthService / UserRepository tách lớp, login đi qua đủ 3 tầng",
+      "Login dùng User model + bcrypt.compare, không còn stub '{ message: Login success }'",
+      "401 thống nhất khi sai email hoặc sai mật khẩu; password không trả về client",
+      "Có TicketReservation model: ref Event/User, seatNumber, ticketCategoryName, price, status enum, heldUntil, timestamps",
+      "Có unique compound index (eventId, seatNumber) và TTL index trên heldUntil — đúng ý định, sai an toàn (xem critical)",
+      "Có aggregation analytics: totalRevenue / confirmedTicketsCount / heldTicketsCount + lookup event title",
+      "Build TypeScript strict pass"
+    ],
+    "missing_requirements": [
+      "TTL/unique index của TicketReservation chưa an toàn cho confirmed + resell ghế cancelled (critical — phải sửa trước khi viết booking)",
+      "Chưa có register / UserRepository.create (mentor đã nêu từ exercise-05)",
+      "Chưa có script lint/test chạy được; ESLint đang fail trên auth.service.ts"
+    ],
+    "note": "Repo không có spec checkpoint chính thức cho bước 6 — phạm vi ước lượng theo file mới (controller/service/repository + TicketReservation + analytics) và khuyến nghị mentor ở exercise-05. Layer auth làm đúng hướng và đáng giữ. REJECTED vì 1 CRITICAL + 1 HIGH trên index của TicketReservation: TTL xóa cả vé confirmed (mất dữ liệu + double-sell), unique không partial nên ghế cancelled không bán lại được. Sửa 2 index này rồi có thể lên APPROVED_WITH_CHANGES."
+  },
+  "recommendation_for_mentor": "Học viên đã nắm layered architecture và nối login thật — đây là tiến bộ rõ so với stub ở bài 5. Buổi tới nên chốt đúng một bài học MongoDB indexes trước khi cho viết booking service: (1) TTL xóa document, không set status, và không hiểu status — bắt buộc partialFilterExpression `{ status: 'held' }` hoặc job đổi `expired` thay vì xóa; (2) unique seat phải partial `{ status: { $in: ['held', 'confirmed'] } }` nếu muốn hủy rồi bán lại và vẫn giữ audit. Đây là nền tảng inventory, để sai rồi viết service phía trên sẽ phải đập model. Tiếp theo: register + E11000 → 409, dọn ESLint unused var, thêm lint/test script (Jest cho login 401 và 'password không lộ'). Nhắc dứt điểm các LOW tồn đọng 3–4 bài (runing, requestId, any-cast, mongo timeout, YAML.load, graceful shutdown) bằng một commit cleanup trước JWT/Docker. devEngines.packageManager đang là string — npm fail install; cần object + field `packageManager` top-level. Analytics aggregation viết tốt, có thể để bài sau mới gắn route."
+}
