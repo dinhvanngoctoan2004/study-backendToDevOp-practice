@@ -8,7 +8,7 @@ class EventController {
     try {
       const event = req.body;
       const resul = await this.eventServ.addNewEvent(event);
-      res.status(200).json({
+      res.status(201).json({
         status: 'success',
         data: resul,
       });
