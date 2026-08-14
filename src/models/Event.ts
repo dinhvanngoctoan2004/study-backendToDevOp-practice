@@ -1,4 +1,5 @@
 import { model, Schema, type Document, type Types } from 'mongoose';
+import { AppError } from '../middlewares/errorHandler.js';
 
 export interface ITicketCategory {
   name: string;
@@ -55,7 +56,8 @@ const eventSchema = new Schema<IEvent>(
 
 eventSchema.pre('validate', function () {
   if (this.endTime <= this.startTime) {
-    this.invalidate('endTime', 'endTime must be greater than startTime');
+    throw new AppError(400, 'endTime', 'endTime must be greater than startTime');
+    // this.invalidate('endTime', 'endTime must be greater than startTime');
   }
 });
 
