@@ -13,10 +13,10 @@ const profile = z.object({
   avatar: z.string().trim().optional(),
 });
 
-export const registeSchema = z.object({
+export const registerSchema = z.object({
   email: z.string().email({ message: 'Invalid email' }).trim().toLowerCase(),
   password: z.string().trim().min(6, 'The password must be at least 6 characters long.'),
   profile: profile,
 });
 
-export type RegisteSchema = z.infer<typeof registeSchema>;
+export type RegisterSchema = z.infer<typeof registerSchema>;

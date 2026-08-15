@@ -55,14 +55,18 @@ paths:
 
   /api/auth/register:
     post:
-      summary: Create an account,
+      summary: Create an account
       requestBody:
-        required: true,
+        required: true
         content:
           application/json:
             schema:
               type: object
               required:
+                - email
+                - password
+                - profile
+              properties:
                 email:
                   type: string
                   format: email
@@ -72,22 +76,25 @@ paths:
                   minLength: 6
                   example: 123456
                 profile:
-                  fullName:
-                    type: string
-                    example: dinhvanngoctoan
-                  phone:
-                    type: string
-                    minLength: 10
-                    example: 0123456789
-                  avatar:
-                    type: string
-                    example: https://www.youtube.com/watch?v=elrSc7MDXk0
+                  type: object
+                  required:
+                    - fullName
+                  properties:
+                    fullName:
+                      type: string
+                      example: Dinh Van Ngoc Toan
+                    phone:
+                      type: string
+                      example: 0123456789
+                    avatar:
+                      type: string
+                      example: https://example.com/avatar.jpg
       responses:
         '201':
-          description: Account created successfully.
+          description: Account created successfully
         '400':
-          description: Input validation error or malformed JSON payload
+          description: Input validation error
         '409':
-          dependencies: Account already exists.
+          description: Account already exists
         '500':
           description: Internal server error
