@@ -1,0 +1,146 @@
+{
+  "review_metadata": {
+    "date": "2026-08-15",
+    "exercise": "Bước 8 — Register API (POST /api/auth/register): route + Zod + Controller/Service/Repository, hoàn thiện các fix exercise-07 (E11000→409, event refine, 201)",
+    "phase": "Backend - Đăng ký tài khoản, password hashing, duplicate-key handling, dọn exercise-07",
+    "commit_hash": "cf2174d",
+    "files_reviewed": [
+      "src/routes/auth.routes.ts",
+      "src/controllers/auth.controller.ts",
+      "src/services/auth.service.ts",
+      "src/repositories/user.repository.ts",
+      "src/repositories/event.repositories.ts",
+      "src/schemas/user.validation.ts",
+      "src/schemas/event.validation.ts",
+      "src/models/User.models.ts",
+      "src/controllers/event.controller.ts",
+      "src/docs/swagger.yaml",
+      "package.json",
+      ".gitignore"
+    ]
+  },
+  "overall_score": 8.0,
+  "verdict": "APPROVED_WITH_CHANGES",
+  "critical_issues": [],
+  "improvements": [
+    {
+      "severity": "MEDIUM",
+      "file": "src/docs/swagger.yaml",
+      "line": 56,
+      "issue": "Khối `/api/auth/register` viết sai cấu trúc OpenAPI/YAML. Đã verify bằng parser: (a) `summary: Create an account,` và `required: true,` có dấu phẩy cuối → `requestBody.required` parse thành chuỗi `\"true,\"` chứ không phải boolean `true`; (b) dưới schema, `required:` lại là một MAP (`email:` / `password:` / `profile:` chứa định nghĩa field) thay vì mảng `['email','password','profile']`, và thiếu hẳn `properties:`; (c) response 409 dùng nhầm key `dependencies:` (dòng 91) thay vì `description:`.",
+      "impact": "App vẫn boot (yamljs parse lỏng, không throw), nhưng swagger-ui render sai contract register: body không hiện fields (vì `properties` mất, `required` là object lạ), body không được đánh dấu required đúng, và 409 không có mô tả. Client dùng 'Try it out' không biết gửi gì. Đây là phần docs duy nhất sai sau khi đã có login làm template đúng.",
+      "suggestion": "Dùng lại đúng cấu trúc khối `/api/auth/login` (dòng 34-43): bỏ mọi dấu phẩy cuối, đặt `required: true` (boolean), `required:` là list `- email` `- password` `- profile`, các field định nghĩa nằm dưới `properties:` (không dưới `required`), và `409:` dùng `description:`. Luôn mở `/api-docs` xác nhận render sau khi viết swagger."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "src/services/auth.service.ts",
+      "line": 14,
+      "issue": "`bcrypt.compare(input.password, check.password!)` dùng non-null assertion `!`. Tồn đọng exercise-06 (MEDIUM), chưa sửa. Nhánh register mới không ảnh hưởng nhưng login vẫn vậy.",
+      "impact": "Nếu vì lý do nào đó `password` không phải string (quên `select('+password')`, data bẩn, hoặc đổi repository) thì `bcrypt.compare` throw TypeError → rơi 500 INTERNAL_ERROR thay vì 401 có kiểm soát. Với `select('+password')` hiện tại xác suất thấp nhưng là điểm yếu phòng thủ.",
+      "suggestion": "Trước compare, kiểm tra tường minh: `if (typeof check.password !== 'string') throw new AppError(401, 'UNAUTHORIZED', 'Incorrect login information')` rồi mới compare — bỏ luôn `!`."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "package.json",
+      "line": 16,
+      "issue": "`devEngines.packageManager` vẫn là string `\"pnpm@11.8.0\"`, thiếu field top-level `packageManager`. Tồn đọng exercise-07, đã verify lại: `npm install`/`npm run`/`npx` fail `Invalid non-object value for \"packageManager\"`; corepack + pnpm 11 cảnh báo bỏ qua.",
+      "impact": "Bất kỳ ai dùng npm/npx (kể cả CI) không cài/chạy được project. Chưa có script \"lint\" thật; \"test\" vẫn là placeholder \"exit 1\".",
+      "suggestion": "Đổi `devEngines.packageManager` thành object `{ \"name\": \"pnpm\", \"version\": \"11.8.0\" }`, thêm top-level `\"packageManager\": \"pnpm@11.8.0\"` cho corepack. Thêm `\"lint\": \"eslint src --max-warnings 0\"` và dựng Jest+Supertest cho login/register."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": ".gitignore",
+      "line": 1,
+      "issue": "Vẫn chưa có `.env.example`. `.gitignore` bỏ qua `.env*` (đúng) và `env.ts` nạp `.env.${NODE_ENV}`, nhưng repo không có file env mẫu nào.",
+      "impact": "Fresh clone không có `MONGO_URI` → `connectMongo` throw → `process.exit(1)`. App không boot được cho tới khi người dùng tự tạo file env đúng tên. Tồn đọng exercise-07.",
+      "suggestion": "Commit `.env.example` với các key mẫu (MONGO_URI, PORT, LOG_LEVEL...), ghi rõ README bước copy sang `.env.development`."
+    },
+    {
+      "severity": "LOW",
+      "file": "src/schemas/user.validation.ts",
+      "line": 16,
+      "issue": "Tên schema bị typo: `registeSchema` / kiểu `RegisteSchema` (thiếu chữ `r` cuối → phải là `register`). Tên export lan ra 4 file (user.validation.ts, auth.routes.ts, user.repository.ts, auth.service.ts).",
+      "impact": "Tên public-ish sai chính tả; sau này rename sẽ chạm nhiều nơi, gây hiểu nhầm cho người đọc.",
+      "suggestion": "Đổi thành `registerSchema` / `RegisterSchema` đồng loạt ở 4 file (cùng commit dọn naming)."
+    },
+    {
+      "severity": "LOW",
+      "file": "src/controllers/auth.controller.ts",
+      "line": 23,
+      "issue": "Typo `resul` vẫn còn — và giờ出现在 code MỚI: `resul` ở auth.controller.ts:10 (login), :23 (register) và auth.service.ts:23 (register). Tồn đọng exercise-07 LOW, giờ lan thêm.",
+      "impact": "Giảm tính chuyên nghiệp; nếu refactor theo tên biến sẽ phải sửa nhiều nơi.",
+      "suggestion": "Đổi thành `result` ở cả controller và service, cùng commit với fix `registe→register`."
+    },
+    {
+      "severity": "LOW",
+      "file": "src/services/auth.service.ts",
+      "line": 11,
+      "issue": "Tên biến không nói ý nghĩa trong login: `check` (user tìm được), `check2` (kết quả bcrypt.compare). Tồn đọng exercise-06 LOW.",
+      "impact": "Khó đọc; `check2` đặc biệt tối nghĩa.",
+      "suggestion": "Đổi `check` → `user`, `check2` → `isMatch`. Gộp vào commit dọn naming."
+    },
+    {
+      "severity": "LOW",
+      "file": "src/models/User.models.ts",
+      "line": 1,
+      "issue": "File model User bị đổi tên thành `User.models.ts` (thêm `.models`), trong khi `Event.ts` và `TicketReservation.ts` không có hậu tố. Không nhất quán convention đặt tên model.",
+      "impact": "Hai phong cách đặt tên song song gây nhiễu khi tìm file; import path cũng lệch (`../models/User.models.js`).",
+      "suggestion": "Đổi lại thành `src/models/User.ts` (cập nhật import ở user.repository.ts) để khớp `Event.ts`/`TicketReservation.ts`."
+    },
+    {
+      "severity": "LOW",
+      "file": "src/schemas/user.validation.ts",
+      "line": 17,
+      "issue": "`password` bị `.trim()` trước khi hash. Password người dùng thường KHÔNG nên trim — khoảng trắng đầu/cuối có thể là một phần mật khẩu chủ ý.",
+      "impact": "Trim âm thầm làm thay đổi mật khẩu người dùng đặt; nếu sau này login cũng trim thì khớp, nhưng nếu client khác không trim sẽ sai mật khẩu. Đây là quyết định sản phẩm cần ý thức, không phải mặc định an toàn.",
+      "suggestion": "Bỏ `.trim()` trên password (chỉ giữ `.min(6)`); trim email thì vẫn nên giữ."
+    },
+    {
+      "severity": "LOW",
+      "file": "src/schemas/user.validation.ts",
+      "line": 12,
+      "issue": "`phone` dùng `.min(10, '... 10 digits long.')` nhưng đó là số ký tự, không phải số chữ số (chưa có regex digit); `avatar` không validate định dạng URL.",
+      "impact": "Phone chứa chữ cái/ký tự đặc biệt vẫn pass; avatar nhận bất kỳ chuỗi nào.",
+      "suggestion": "Nếu muốn số điện thoại: thêm `.regex(/^[0-9()+\\-\\s]{10,}$/)`. Avatar: `.url()` (zod) hoặc bỏ qua nếu optional."
+    },
+    {
+      "severity": "LOW",
+      "file": "src/controllers/auth.controller.ts",
+      "line": 20,
+      "issue": "Controller register gần như bản sao của login (try/catch + envelope success). Cùng lúc event.controller cũng cùng pattern.",
+      "impact": "Code lặp; mỗi endpoint mới lại copy try/catch, dễ sinh lệch envelope.",
+      "suggestion": "Định hướng refactor (khi đã 3+ controller): viết `asyncHandler` wrapper tự `next(err)` và một helper trả envelope success thống nhất. Chưa làm ngay được."
+    },
+    {
+      "severity": "LOW",
+      "file": "src/index.ts",
+      "line": 60,
+      "issue": "Các LOW tồn đọng nhiều bài vẫn chưa dọn: typo `runing` (index.ts:60); `requestId` tin tưởng header client (log injection); `(err as any).status` (errorHandler); `serverSelectionTimeoutMS: 500` hardcode; `YAML.load` không try/catch; swagger `servers[].url` hardcode localhost; chưa graceful shutdown.",
+      "impact": "Nợ kỹ thuật chồng khi sắp sang JWT/booking/Docker.",
+      "suggestion": "Dọn bằng MỘT commit cleanup riêng: sửa typo, sanitize request-id, bỏ `as any`, đưa Mongo timeout vào env, bọc `YAML.load` try/catch, thêm SIGTERM đóng server+mongoose."
+    }
+  ],
+  "positives": [
+    "Luồng register đúng và AN TOÀN: route → validate(registeSchema) → AuthController.register → AuthService.register → UserRepository.createUser → User.create. Password được hash qua `pre('save')` của User model (bcrypt, genSalt 10) — và `Model.create()` gọi `.save()` nên hash chạy; password có `select:false` và bị strip khỏi response bằng `toObject()` + destructure. Trả 201 Created.",
+    "Học viên ĐÃ CHỦ ĐỘNG sửa nhiều MEDIUM của exercise-07 trong cùng commit — tín hiệu phản hồi tốt: event repo bắt E11000 (slug) → AppError 409; user repo bắt E11000 (email) → 409; event schema thêm `.refine()` cho cả `endTime > startTime` VÀ `availableQuantity <= totalQuantity`; event create đổi sang 201; gộp login schema từ validation.ts vào user.validation.ts.",
+    "Duplicate email xử lý đúng: `User.email` có `unique: true` → E11000 → bắt trong `createUser` → `throw new AppError(409, 'CONFLICT', 'Account already exists.')`. Đây chính phần thiếu mà exercise-06 yêu cầu — giờ hoàn thiện.",
+    "`registeSchema` (Zod) kỹ: email format, password min 6, profile.fullName min 2; role mặc định 'customer' qua model default.",
+    "Đổi `{ password: _password, ...safeUser }` dùng tiền tố `_` cho biến không dùng → ESLint sạch (sửa đúng lỗi unused-var exercise-06).",
+    "Đã verify trên cây cf2174d: `tsc --noEmit` PASS với strict + noUncheckedIndexedAccess + exactOptionalPropertyTypes + verbatimModuleSyntax; `eslint src` exit 0.",
+    "Layering nhất quán với pattern auth/event đã có; dependency injection qua constructor (dễ fake repository khi viết test cho register 409/login 401)."
+  ],
+  "checkpoint_status": {
+    "meets_requirements": [
+      "Có route POST /api/auth/register gắn validate(registeSchema)",
+      "Luồng đăng ký đi đủ 3 tầng Controller → Service → Repository (createUser) — hoàn thiện yêu cầu register treo từ exercise-06",
+      "Password được hash bằng bcrypt (pre-save), KHÔNG lưu plaintext",
+      "Email trùng → 409 CONFLICT (E11000 được ánh xạ)",
+      "Password không bao giờ trả về client (select:false + strip)",
+      "Trả 201 Created khi tạo tài khoản",
+      "Build TypeScript strict pass + ESLint sạch (verify trên cf2174d)"
+    ],
+    "missing_requirements": [],
+    "note": "Đạt toàn bộ yêu cầu trọng tâm bài Register API và chủ động đóng 5 MEDIUM của exercise-07 (E11000→409 ở 2 repo, event refine×2, 201, gộp schema). Không còn critical/high. APPROVED_WITH_CHANGES vì: (1) swagger /api/auth/register sai cấu trúc (verify parse: required=chuỗi 'true,', schema.required là object thay vì mảng, thiếu properties, 409 dùng key 'dependencies'); và 3 MEDIUM tồn đọng vẫn mở: check.password! non-null assertion, npm/npx hỏng do packageManager string, thiếu .env.example."
+  },
+  "recommendation_for_mentor": "Học viên làm tốt và đang lặp lại phản hồi nhanh — đã tự đóng nhiều MEDIUM của exercise-07 cùng lúc với bài register. Nền tảng auth giờ vững (hash, 409, password strip, layering). Buổi tới nên: (1) Dạy thói quen XÁC NHẬN docs render thật — mở /api-docs sau khi viết swagger; khối register đang sai cấu trúc (dấu phẩy cuối, `required` viết thành map, 409 dùng nhầm `dependencies`), dùng khối login làm template đúng. (2) Chốt 'runnability' trước khi vào CI/Docker: sửa devEngines.packageManager thành object + thêm top-level packageManager (npm/npx đang hỏng hoàn toàn — đã verify), commit .env.example. (3) Phòng thủ login: thay `check.password!` bằng kiểm tra `typeof` → 401, tránh 500 khi data bẩn. (4) Một commit dọn naming: registe→register, resul→result, check/check2→user/isMatch, đổi User.models.ts→User.ts cho khớp model khác; bỏ `.trim()` trên password. (5) Tiếp tục sang JWT/booking — nền auth đã sẵn sàng; khi viết booking nhớ tận dụng pattern E11000→AppError và refine Zod mà học viên vừa làm đúng."
+}
