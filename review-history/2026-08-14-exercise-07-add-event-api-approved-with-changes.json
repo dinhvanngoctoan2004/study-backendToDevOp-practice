@@ -1,0 +1,158 @@
+{
+  "review_metadata": {
+    "date": "2026-08-14",
+    "exercise": "Bước 7 — Add Event API (POST /api/events): route + Zod validate + Controller/Service/Repository",
+    "phase": "Backend - Tạo endpoint thêm sự kiện, layered architecture, Zod validation",
+    "commit_hash": "3a1ce93",
+    "files_reviewed": [
+      "src/routes/event.routes.ts",
+      "src/controllers/event.controller.ts",
+      "src/services/event.service.ts",
+      "src/repositories/event.repositories.ts",
+      "src/schemas/event.validation.ts",
+      "src/models/Event.ts",
+      "src/models/TicketReservation.ts",
+      "src/middlewares/validate.ts",
+      "src/middlewares/errorHandler.ts",
+      "src/config/env.ts",
+      "src/config/mongo.ts",
+      "src/index.ts",
+      "src/docs/swagger.yaml",
+      "package.json",
+      ".gitignore",
+      "tsconfig.json"
+    ]
+  },
+  "overall_score": 7.5,
+  "verdict": "APPROVED_WITH_CHANGES",
+  "critical_issues": [],
+  "improvements": [
+    {
+      "severity": "MEDIUM",
+      "file": "src/repositories/event.repositories.ts",
+      "line": 6,
+      "issue": "`Event.create(input)` không bắt lỗi duplicate key. Trường `slug` có `unique: true` (Event.ts:38); khi tạo event trùng slug, MongoDB ném `MongoServerError` mã E11000 — đây KHÔNG phải `AppError`.",
+      "impact": "E11000 lan truyền nguyên vẹn qua service → controller → `next(err)` → rơi nhánh cuối của errorHandler, trả `500 INTERNAL_ERROR` cho một tình huống client có thể sửa (đổi slug). Khó chịu hơn: đây chính pattern sẽ lặp lại với duplicate email khi làm register (exercise-06 đã nêu). Trả 500 cho lỗi nhập liệu làm sai contract API.",
+      "suggestion": "Bọc `Event.create` trong try/catch ở repository (hoặc một helper ánh xạ lỗi DB). Nhận diện E11000 (vd kiểm `err.code === 11000` và trích field từ `err.keyPattern`) rồi ném `throw new AppError(409, 'CONFLICT', '...')` với message chỉ rõ field trùng (slug). Định hướng: централиз error mapping ở tầng repository/service, đừng để MongoError thoát ra handler."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "src/models/Event.ts",
+      "line": 58,
+      "issue": "Quy tắc chéo `endTime > startTime` đang được thực thi ở `pre('validate')` của Mongoose bằng cách ném `AppError(400, 'endTime', ...)` (Event.ts:58-59), tách rời khỏi lớp validate Zod.",
+      "impact": "Đã verify thực tế bằng `.validate()`: AppError surfaced sạch (name=AppError, statusCode=400) nên KHÔNG thành 500 — tốt. Nhưng nhập liệu bị chia hai luồng với hai envelope khác nhau: lỗi field của Zod → `422 VALIDATION_ERROR` (xem chi tiết flatten), còn luật endTime → `400` với `code: 'endTime'` (không có details). Cùng là 'input không hợp lệ' nhưng status/mã/envelope không nhất quán, client phải xử lý 2 nhánh.",
+      "suggestion": "Gom toàn bộ validate input vào một nơi — đưa luật chéo vào schema Zod bằng `.refine()`, ví dụ `addAndEditEvent.refine(d => d.endTime > d.startTime, { path: ['endTime'], message: '...' })`. Khi đó mọi lỗi nhập liệu đều ra `422 VALIDATION_ERROR` thống nhất; bỏ pre('validate') ném AppError (hoặc giữ `this.invalidate` ở Mongoose chỉ làm hàng rào thứ hai)."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "src/controllers/event.controller.ts",
+      "line": 11,
+      "issue": "Tạo resource mới trả `res.status(200)` thay vì `201 Created`.",
+      "impact": "Vi phạm quy ước REST cho POST tạo mới; client/monitoring không phân biệt được 'tạo mới thành công' với 'GET-type OK'. Auth login (event-controller) cùng pattern nên cần chốt chuẩn luôn cho cả app.",
+      "suggestion": "Trả `201` cho endpoint tạo resource (`res.status(201).json(...)`). Login (không tạo resource, chỉ xác thực) giữ 200 là hợp lý — phân biệt rõ hai ngữ cảnh."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "src/schemas/event.validation.ts",
+      "line": 12,
+      "issue": "Không chặn `availableQuantity > totalQuantity` trên từng phần tử `ticketCategories`. Zod chỉ đặt `totalQuantity: min(1)` (dòng 12) và `availableQuantity: min(0)` (dòng 13); `pre('validate')` ở Event.ts cũng chỉ kiểm endTime.",
+      "impact": "Tồn đọng từ exercise-06 (MEDIUM): event vẫn lưu được trạng thái vô lý — vé còn nhiều hơn tổng vé. Khi viết booking service ngay sau, inventory sẽ bị phá (bán dư).",
+      "suggestion": "Thêm `.refine()` duyệt mảng: nếu phần tử nào `availableQuantity > totalQuantity` thì báo lỗi path tới index đó; hoặc kiểm trong `pre('validate')` bằng `this.invalidate`. Nên làm ở Zod cho nhất quán với improvement #2."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "package.json",
+      "line": 16,
+      "issue": "`devEngines.packageManager` là string `\"pnpm@11.8.0\"` và thiếu field top-level `packageManager`. Đã verify thực tế: `npm install`/`npm run`/`npx tsc` đều fail ngay `Invalid non-object value for \"packageManager\"`; corepack và pnpm 11 cảnh báo bỏ qua field này; `pnpm.onlyBuiltDependencies` cũng không còn được đọc.",
+      "impact": "Bất kỳ ai dùng npm (kể cả `npx` mà chính học viên hay CI dùng) không cài/chạy được project. Cảnh báo hiện ra mỗi lệnh. Chưa có script `lint` thật (README ghi `pnpm lint`) và `test` vẫn là placeholder `exit 1`.",
+      "suggestion": "Đổi `devEngines.packageManager` thành object `{ \"name\": \"pnpm\", \"version\": \"11.8.0\" }`, thêm field top-level `\"packageManager\": \"pnpm@11.8.0\"` cho corepack, chuyển `onlyBuiltDependencies` sang `pnpm-workspace.yaml`. Thêm `\"lint\": \"eslint src --max-warnings 0\"` và dựng Jest+Supertest cho POST /api/events (thành công 201, trùng slug 409, endTime sai 422)."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": ".gitignore",
+      "line": 1,
+      "issue": "`.gitignore` giờ có `.env*` và `dist/` (đúng — bảo mật secret + bớt noise build), và `env.ts` load `.env.${NODE_ENV}`. Nhưng repo KHÔNG có file `.env.*` nào và KHÔNG có `.env.example`.",
+      "impact": "Ở fresh clone không có `MONGO_URI` → `connectMongo` ném → `process.exit(1)` ở bootstrap. App không chạy được theo workflow trong README cho đến khi người dùng tự đoán và tạo file env đúng tên. Đây là dạng tiến hóa của vấn đề dotenv exercise-03.",
+      "suggestion": "Commit một `.env.example` (hoặc `.env.development.example`) chứa các key với giá trị mẫu/giả (MONGO_URI, PORT, LOG_LEVEL...). Ghi rõ trong README bước copy sang `.env.development`. Như vậy fresh clone chạy được ngay mà vẫn không lộ giá trị thật."
+    },
+    {
+      "severity": "LOW",
+      "file": "src/controllers/event.controller.ts",
+      "line": 10,
+      "issue": "Typo biến `resul` (dòng 10 và 13). Cùng typo vẫn còn ở `auth.controller.ts:10` (carryover exercise-06).",
+      "impact": "Giảm tính chuyên nghiệp, khó grep; nếu sau này refactored theo tên biến sẽ phải sửa nhiều nơi.",
+      "suggestion": "Đổi thành `result` ở cả hai controller trong cùng commit dọn dẹp."
+    },
+    {
+      "severity": "LOW",
+      "file": "src/schemas/event.validation.ts",
+      "line": 18,
+      "issue": "`slug` chỉ `.toLowerCase().trim()` mà không validate định dạng — chấp nhận khoảng trắng, ký tự unicode/đặc biệt. Tính duy nhất hoàn toàn phụ thuộc DB index (và rơi vào bug E11000→500 ở improvement #1).",
+      "impact": "Slug 'bẩn' tạo URL xấu, gây vấn đề SEO/routing; không có lớp phòng thủ sớm ở validate.",
+      "suggestion": "Thêm regex định dạng slug, vd `.regex(/^[a-z0-9-]+$/, 'slug chỉ chứa chữ thường, số và dấu gạch')`. Có thể cân nhắc tự sinh slug từ title nếu client không gửi."
+    },
+    {
+      "severity": "LOW",
+      "file": "src/schemas/event.validation.ts",
+      "line": 19,
+      "issue": "`organizerId` chỉ kiểm tra định dạng 24-hex, không kiểm tra User có tồn tại. Mongoose `ref` không ép tính toàn vẹn tham chiếu.",
+      "impact": "Có thể tạo event gắn cho organizer không tồn tại (foreign key 'mồ côi'). Ở giai đoạn MVP chấp nhận được, nhưng sẽ thành vấn đề khi có luồng publish/booking.",
+      "suggestion": "Ghi nhận là lời nhắc cho bài sau (khi có auth/wiring): kiểm tra existence trong service trước khi tạo, hoặc dùng middleware riêng. Không cần làm ngay bài này."
+    },
+    {
+      "severity": "LOW",
+      "file": "src/schemas/event.validation.ts",
+      "line": 16,
+      "issue": "Schema tên `addAndEditEvent` (dùng cho cả thêm lẫn sửa) nhưng hiện chỉ POST dùng. Khi làm PUT/PATCH edit sẽ cần partial (cho phép thiếu field) và xử lý `_id`/`slug` không đổi.",
+      "impact": "Tên hứa hẹn nhiều hơn phạm vi hiện tại; edit với schema strict hiện tại sẽ reject payload thiếu field.",
+      "suggestion": "Khi làm edit: tách `createEventSchema` và `updateEventSchema` (dùng `.partial()`), hoặc thêm option. Chỉ ghi nhận phạm vi — chưa cần làm bài này."
+    },
+    {
+      "severity": "LOW",
+      "file": "src/controllers/event.controller.ts",
+      "line": 7,
+      "issue": "Controller lặp pattern try/catch + envelope success giống hệt `auth.controller.ts`. Hai controller là bản sao gần như y hệt nhau.",
+      "impact": "Code lặp; mỗi endpoint mới lại copy try/catch; dễ sinh lệch envelope giữa các route.",
+      "suggestion": "Định hướng refactor: viết `asyncHandler` wrapper tự `next(err)` (bỏ try/catch thủ công) và một helper trả envelope success thống nhất. Áp dụng khi đã có 3+ controller."
+    },
+    {
+      "severity": "LOW",
+      "file": "src/docs/swagger.yaml",
+      "line": 1,
+      "issue": "Swagger chỉ document `/health`, `/ready`, `/api/auth/login`. Endpoint `POST /api/events` — trọng tâm bài này — không có entry.",
+      "impact": "Tài liệu lệch code; 'Try it out' không cho thấy endpoint mới, client không biết request body/status code. Pattern 'docs tụt sau code' đã lặp nhiều bài.",
+      "suggestion": "Thêm path `/api/events` method `post`: requestBody schema (title, slug, organizerId, location, startTime, endTime, ticketCategories, status), responses 201/400/409/422/500."
+    },
+    {
+      "severity": "LOW",
+      "file": "src/index.ts",
+      "line": 60,
+      "issue": "Các LOW tồn đọng 3-4 bài vẫn chưa dọn: typo `runing` (index.ts:60); `requestId` tin tưởng header client `as string` không sanitize (log injection); `(err as any).status` trong errorHandler.ts:29 (cast `any` phá strict); `serverSelectionTimeoutMS: 500` hardcode quá thấp (mongo.ts:14); `YAML.load` không try/catch (index.ts:23); swagger `servers[].url` hardcode localhost; chưa graceful shutdown (SIGTERM); `env.ts` chưa Zod-validate.",
+      "impact": "Review lặp cùng nội dung nhiều bài; nợ kỹ thuật chồng khi sắp sang JWT/booking/Docker.",
+      "suggestion": "Dọn bằng MỘT commit cleanup riêng trước bài JWT/booking: sửa typo, sanitize request-id (chỉ chấp nhận `[A-Za-z0-9-]{1,64}`), type guard hẹp thay `as any`, đưa Mongo timeout vào env, bọc `YAML.load` try/catch, thêm SIGTERM đóng server + mongoose."
+    }
+  ],
+  "positives": [
+    "Layered architecture cho Event đúng chuẩn README và nhất quán với Auth: route bọc `(req, res, next) => eventController.addNewEvent(...)` giữ `this`; controller → service → repository; constructor inject singleton (dễ fake khi viết test). Service hiện mỏng (chỉ delegate) nhưng đúng vị trí để đặt business logic sau này.",
+    "Đã xử lý ĐÚNG hai CRITICAL của exercise-06 trên TicketReservation: TTL index giờ có `partialFilterExpression: { status: 'held' }` (không còn xóa vé confirmed — hết rủi ro mất dữ liệu/double-sell), và unique seat index có `partialFilterExpression: { status: { $in: ['held','confirmed'] } }` (ghế cancelled có thể bán lại, vẫn giữ audit trail). Học viên đã tiếp thu và sửa review bị từ chối — đây là điểm sáng.",
+    "Zod schema `addAndEditEvent` khá kỹ cho payload tạo event: trim string, lowercase slug, regex 24-hex cho organizerId, coerce date, ràng buộc min cho price/quantity, enum status với default an toàn 'draft'. Validate chạy TRƯỚC khi vào service.",
+    "Đã verify thực tế: `pre('validate')` ném AppError surface sạch (không bị Mongoose bọc) → luật `endTime > startTime` trả 400 có kiểm soát, KHÔNG rơi 500. Tức lỗi logic phân luồng đúng, chỉ còn vấn đề nhất quán envelope (xem improvement).",
+    "`tsc --noEmit` PASS với strict + noUncheckedIndexedAccess + exactOptionalPropertyTypes + verbatimModuleSyntax; `eslint src` exit 0 (sạch).",
+    "`.gitignore` đã thêm `.env*` và `dist/` — giải quyết vấn đề rò rỉ secret và noise build artifact từ exercise-03.",
+    "`errorHandler` đã đưa kiểm tra `res.headersSent` lên sớm (ngay sau log, trước các nhánh set status) — sửa đúng thứ tự mà exercise-03 yêu cầu.",
+    "`env.ts` giờ nạp `.env.${NODE_ENV}` — sửa đúng vấn đề 'dotenv không phân biệt môi trường' của exercise-03."
+  ],
+  "checkpoint_status": {
+    "meets_requirements": [
+      "Có route POST /api/events gắn middleware validate(addAndEditEvent)",
+      "Luồng tạo sự kiện đi đủ 3 tầng: EventController → EventService → EventRepository (Event.create)",
+      "Lỗi lan truyền qua next(err) tới errorHandler tập trung, không nuốt lỗi",
+      "Schema Zod validate đầy đủ field: title, slug, organizerId (ObjectId), location, startTime/endTime, ticketCategories, status enum",
+      "Event model có unique index slug, index { organizerId, startTime }, timestamps, pre-validate cho endTime",
+      "Build TypeScript strict pass + ESLint sạch"
+    ],
+    "missing_requirements": [],
+    "note": "Đạt toàn bộ yêu cầu trọng tâm bài 'Add Event API' và đáng khen vì đã tự sửa 2 CRITICAL của exercise-06 (TicketReservation TTL/unique index). Không còn critical/high nào. Verdict APPROVED_WITH_CHANGES vì còn 6 MEDIUM: (1) trùng slug E11000 bị trả 500 thay vì 409; (2) luật endTime trả 400 thay vì 422 VALIDATION_ERROR thống nhất; (3) POST tạo mới trả 200 thay vì 201; (4) chưa chặn availableQuantity > totalQuantity; (5) npm/npx hỏng do devEngines.packageManager là string (đã verify); (6) thiếu .env.example khiến fresh clone không boot được."
+  },
+  "recommendation_for_mentor": "Học viên làm bài tốt: layer Event đúng chuẩn và ĐÃ TỰ SỬA hai critical của exercise-06 (đây là tín hiệu tích cực về khả năng tiếp thu). Buổi tới nên chốt 3 chủ đề trước khi cho viết booking service: (1) Centralized error mapping — dạy cách bắt MongoServerError (E11000 và các code khác) ở repository/service rồi chuyển thành AppError với đúng status (409 CONFLICT cho trùng slug/email), đừng để lỗi DB thoát ra handler thành 500; áp dụng luôn cho register khi làm tiếp. (2) Quyết MỘT lớp validate — chuyển toàn bộ luật chéo (endTime>startTime, availableQuantity<=totalQuantity) vào Zod .refine() để mọi lỗi nhập liệu ra một envelope 422 VALIDATION_ERROR duy nhất, bỏ thói quen chia validate giữa Zod và Mongoose. (3) REST hygiene — 201 cho tạo resource, envelope success nhất quán. Song song cần unblock runnability: sửa devEngines.packageManager thành object + thêm top-level packageManager (npm/npx đang hỏng hoàn toàn — đã verify), và commit .env.example. Cuối cùng, cho học viên một commit cleanup để xóa nợ LOW kéo dài 3-4 bài (runing, requestId log-injection, any-cast, mongo timeout, YAML.load, graceful shutdown) trước khi sang JWT/booking. Swagger cho POST /api/events nên cập nhật cùng lúc."
+}
