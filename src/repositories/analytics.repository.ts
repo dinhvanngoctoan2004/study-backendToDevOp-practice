@@ -1,5 +1,5 @@
 import { Types } from 'mongoose';
-import { TicketReservation } from '../models/TicketReservation.js';
+import { TicketReservation } from '../models/Ticket.models.js';
 
 export const getEventAnalytics = async (eventId: string) => {
   const result = await TicketReservation.aggregate([

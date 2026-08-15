@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { loginSchema, registeSchema } from '../schemas/user.validation.js';
+import { loginSchema, registerSchema } from '../schemas/user.validation.js';
 import { validate } from '../middlewares/validate.js';
 import { authController } from '../controllers/auth.controller.js';
 
@@ -9,7 +9,7 @@ router.post('/login', validate(loginSchema), (req, res, next) =>
   authController.login(req, res, next),
 );
 
-router.post('/register', validate(registeSchema), (req, res, next) =>
+router.post('/register', validate(registerSchema), (req, res, next) =>
   authController.register(req, res, next),
 );
 

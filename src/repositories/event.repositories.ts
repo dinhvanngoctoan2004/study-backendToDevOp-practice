@@ -1,5 +1,5 @@
 import { AppError } from '../middlewares/errorHandler.js';
-import { Event, type IEvent } from '../models/Event.js';
+import { Event, type IEvent } from '../models/Event.models.js';
 import type { AddAndEditEvent } from '../schemas/event.validation.js';
 
 export class EventRepository {
