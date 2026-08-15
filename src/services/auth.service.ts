@@ -1,7 +1,7 @@
 import bcrypt from 'bcrypt';
 import { AppError } from '../middlewares/errorHandler.js';
 import { userRepository, type UserRepository } from '../repositories/user.repository.js';
-import type { LoginInput } from '../schemas/validation.js';
+import type { LoginInput, RegisteSchema } from '../schemas/user.validation.js';
 
 export class AuthService {
   constructor(private userRepo: UserRepository = userRepository) {}
@@ -16,6 +16,12 @@ export class AuthService {
     if (!check2) throw new AppError(401, 'UNAUTHORIZED', 'Incorrect login information');
 
     const { password: _password, ...safeUser } = check.toObject();
+    return safeUser;
+  }
+
+  async register(input: RegisteSchema) {
+    const resul = await this.userRepo.createUser(input);
+    const { password: _password, ...safeUser } = resul.toObject();
     return safeUser;
   }
 }

@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { loginSchema } from '../schemas/validation.js';
+import { loginSchema, registeSchema } from '../schemas/user.validation.js';
 import { validate } from '../middlewares/validate.js';
 import { authController } from '../controllers/auth.controller.js';
 
@@ -7,6 +7,10 @@ const router: Router = Router();
 
 router.post('/login', validate(loginSchema), (req, res, next) =>
   authController.login(req, res, next),
+);
+
+router.post('/register', validate(registeSchema), (req, res, next) =>
+  authController.register(req, res, next),
 );
 
 export default router;

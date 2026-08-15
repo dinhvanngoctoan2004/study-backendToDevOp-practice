@@ -5,7 +5,7 @@ import type { AddAndEditEvent } from '../schemas/event.validation.js';
 export class EventRepository {
   async addNewEvent(input: AddAndEditEvent): Promise<IEvent> {
     try {
-      return Event.create(input);
+      return await Event.create(input);
     } catch (err) {
       if (err instanceof Error && 'code' in err && err.code === 11000)
         throw new AppError(

@@ -7,8 +7,8 @@ export interface IUser extends Document {
   role: 'customer' | 'organizer' | 'admin';
   profile: {
     fullName: string;
-    phone?: string;
-    avatar?: string;
+    phone?: string | undefined;
+    avatar?: string | undefined;
   };
   createdAt: Date;
   updatedAt: Date;
@@ -22,7 +22,7 @@ const userSchema = new Schema<IUser>(
     profile: {
       fullName: { type: String, required: true, trim: true },
       phone: { type: String, trim: true },
-      avatar: { type: String },
+      avatar: { type: String, trim: true },
     },
   },
   { timestamps: true },

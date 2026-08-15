@@ -16,6 +16,19 @@ class AuthController {
       next(err);
     }
   }
+
+  async register(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const user = req.body;
+      const resul = await this.authServ.register(user);
+      res.status(201).json({
+        status: 'success',
+        data: resul,
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
 }
 
 export const authController = new AuthController();

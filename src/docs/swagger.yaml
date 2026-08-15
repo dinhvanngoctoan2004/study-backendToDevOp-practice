@@ -52,3 +52,42 @@ paths:
           description: Input validation error or malformed JSON payload
         '500':
           description: Internal server error
+
+  /api/auth/register:
+    post:
+      summary: Create an account,
+      requestBody:
+        required: true,
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                email:
+                  type: string
+                  format: email
+                  example: user@gmail.com
+                password:
+                  type: string
+                  minLength: 6
+                  example: 123456
+                profile:
+                  fullName:
+                    type: string
+                    example: dinhvanngoctoan
+                  phone:
+                    type: string
+                    minLength: 10
+                    example: 0123456789
+                  avatar:
+                    type: string
+                    example: https://www.youtube.com/watch?v=elrSc7MDXk0
+      responses:
+        '201':
+          description: Account created successfully.
+        '400':
+          description: Input validation error or malformed JSON payload
+        '409':
+          dependencies: Account already exists.
+        '500':
+          description: Internal server error
