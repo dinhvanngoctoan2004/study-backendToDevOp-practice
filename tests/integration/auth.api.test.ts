@@ -1,7 +1,6 @@
 import { describe, it, expect } from '@jest/globals';
 import request from 'supertest';
 import app from '../../src/app';
-import { error } from 'node:console';
 
 describe('Auth API - Integration Test', () => {
   describe('/api/auth/register - Input Validation', () => {
