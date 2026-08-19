@@ -1,5 +1,5 @@
 import { EventRepository, eventRepository } from '../repositories/event.repositories.js';
-import type { AddAndEditEvent } from '../schemas/event.validation.js';
+import type { AddAndEditEvent } from '@repo/contracts';
 
 export class EventService {
   constructor(private eventRepo: EventRepository = eventRepository) {}

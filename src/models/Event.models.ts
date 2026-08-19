@@ -1,5 +1,5 @@
 import { model, Schema, type Document, type Types } from 'mongoose';
-import { AppError } from '../middlewares/errorHandler.js';
+import { AppError } from '../utils/AppError.utils.js';
 
 export interface ITicketCategory {
   name: string;

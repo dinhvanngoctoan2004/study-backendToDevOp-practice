@@ -1,6 +1,6 @@
-import { AppError } from '../middlewares/errorHandler.js';
+import { AppError } from '../utils/AppError.utils.js';
 import { Event, type IEvent } from '../models/Event.models.js';
-import type { AddAndEditEvent } from '../schemas/event.validation.js';
+import type { AddAndEditEvent } from '@repo/contracts';
 
 export class EventRepository {
   async addNewEvent(input: AddAndEditEvent): Promise<IEvent> {

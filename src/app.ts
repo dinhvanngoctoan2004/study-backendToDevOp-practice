@@ -9,6 +9,7 @@ import { requestId } from './middlewares/requestId.js';
 import swaggerUI from 'swagger-ui-express';
 import YAML from 'yamljs';
 import path from 'node:path';
+import cookieParser from 'cookie-parser';
 
 const app: Express = express();
 app.use(requestId);
@@ -20,6 +21,8 @@ app.use(
 app.use(express.json());
 const swaggerDocument = YAML.load(path.join(process.cwd(), 'src/docs/swagger.yaml'));
 app.use('/api-docs', swaggerUI.serve, swaggerUI.setup(swaggerDocument));
+
+app.use(cookieParser());
 
 app.use('/api/auth', authRouter);
 

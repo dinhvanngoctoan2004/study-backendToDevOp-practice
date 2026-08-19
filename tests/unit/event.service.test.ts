@@ -1,6 +1,6 @@
 import { jest, describe, it, expect, beforeEach } from '@jest/globals';
 import { EventService } from '../../src/services/event.service';
-import { AppError } from '../../src/middlewares/errorHandler';
+import { AppError } from '../../src/utils/AppError.utils.js';
 
 describe('Event services', () => {
   let eventService: EventService;

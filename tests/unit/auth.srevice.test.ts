@@ -1,4 +1,4 @@
-import { AppError } from '../../src/middlewares/errorHandler.js';
+import { AppError } from '../../src/utils/AppError.utils.js';
 import { UserRepository } from '../../src/repositories/user.repository.js';
 import { AuthService } from '../../src/services/auth.service.js';
 import { jest, describe, it, expect, beforeEach } from '@jest/globals';
@@ -75,8 +75,9 @@ describe('AuthService', () => {
         password: 'correctpassword',
       });
 
-      expect(result).toHaveProperty('email', 'test@gmail.com');
-      expect(result).not.toHaveProperty('password');
+      expect(result).toHaveProperty('safeUser');
+      expect(result).toHaveProperty('token');
+      expect(result.safeUser).not.toHaveProperty('password');
     });
   });
 
@@ -123,8 +124,9 @@ describe('AuthService', () => {
       mockUserRepo.createUser.mockResolvedValue(fakeData);
 
       const result = await authService.register(fakeData);
-
-      expect(result).toMatchObject({
+      expect(result).toHaveProperty('safeUser');
+      expect(result).toHaveProperty('token');
+      expect(result.safeUser).toMatchObject({
         email: 'test@gmail.com',
         profile: {
           fullName: 'toan',

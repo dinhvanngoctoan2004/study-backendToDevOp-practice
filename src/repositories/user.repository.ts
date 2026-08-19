@@ -1,6 +1,6 @@
-import { AppError } from '../middlewares/errorHandler.js';
+import { AppError } from '../utils/AppError.utils.js';
 import { User, type IUser } from '../models/User.models.js';
-import type { RegisterSchema } from '../schemas/user.validation.js';
+import type { RegisterSchema } from '@repo/contracts';
 
 export class UserRepository {
   async findByEmail(email: string): Promise<IUser | null> {
@@ -16,6 +16,10 @@ export class UserRepository {
       }
       throw err;
     }
+  }
+
+  async findById(userId: string): Promise<IUser | null> {
+    return await User.findById(userId);
   }
 }
 
