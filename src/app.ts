@@ -10,7 +10,9 @@ import swaggerUI from 'swagger-ui-express';
 import YAML from 'yamljs';
 import path from 'node:path';
 import cookieParser from 'cookie-parser';
+import cors from 'cors';
 
+//////////// cấu hình
 const app: Express = express();
 app.use(requestId);
 app.use(
@@ -23,6 +25,16 @@ const swaggerDocument = YAML.load(path.join(process.cwd(), 'src/docs/swagger.yam
 app.use('/api-docs', swaggerUI.serve, swaggerUI.setup(swaggerDocument));
 
 app.use(cookieParser());
+
+app.use(
+  cors({
+    origin: ['http://localhost:5173', 'http://127.0.0.1:5173'],
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'x-request-id'],
+  }),
+);
+///////////////////// enpoint ///////////////////
 
 app.use('/api/auth', authRouter);
 
@@ -48,6 +60,8 @@ app.get('/ready', async (req: Request, res: Response) => {
     database: 'connected',
   });
 });
+
+///////////// hứng lỗi ////////////////////
 
 app.use(error404);
 app.use(errorHandler);

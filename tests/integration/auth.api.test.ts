@@ -13,7 +13,7 @@ describe('Auth API - Integration Test', () => {
   afterAll(async () => {
     await mongoose.connection.close();
   });
-
+  ////////////////////////////////////////////
   describe('/api/auth/register - Input Validation', () => {
     it('nên trả về 400 Bad request', async () => {
       const req = await request(app)
@@ -95,7 +95,7 @@ describe('Auth API - Integration Test', () => {
       expect(req.header['set-cookie']).toBeDefined();
     });
   });
-
+  /////////////////////////////////////////////
   describe('/api/auth/login - Input Validation', () => {
     it('case 1: đăng nhập thành công trả về đủ dữ liệu ', async () => {
       const req = await request(app).post('/api/auth/login').send({
@@ -105,8 +105,48 @@ describe('Auth API - Integration Test', () => {
       expect(req.status).toBe(200);
       expect(req.header['set-cookie']).toBeDefined();
     });
-  });
 
+    it('case 2: chặn NoSQL Injection ', async () => {
+      const req = await request(app)
+        .post('/api/auth/login')
+        .send({
+          email: { $ne: null },
+          password: { $ne: null },
+        });
+
+      expect(req.status).toBe(422);
+      expect(req.body.error.code).toBe('VALIDATION_ERROR');
+    });
+
+    it('case 3: gửi req liên tục để xem có bị chặn vì đăng nhập nhiều hay không', async () => {
+      const req = await request(app).post('/api/auth/login').send({
+        email: 'client@gmail.com',
+        password: '123456789',
+      });
+      const req1 = await request(app).post('/api/auth/login').send({
+        email: 'client@gmail.com',
+        password: '123456789',
+      });
+      const req2 = await request(app).post('/api/auth/login').send({
+        email: 'client@gmail.com',
+        password: '123456789',
+      });
+      const req3 = await request(app).post('/api/auth/login').send({
+        email: 'client@gmail.com',
+        password: '123456789',
+      });
+      const req4 = await request(app).post('/api/auth/login').send({
+        email: 'client@gmail.com',
+        password: '123456789',
+      });
+      const req5 = await request(app).post('/api/auth/login').send({
+        email: 'client@gmail.com',
+        password: '123456789',
+      });
+      expect(req5.status).toBe(429);
+    });
+  });
+  //////////////////////////////
   describe('/api/auth/me - Input Validation', () => {
     it('case 1: bị chặn khi không có token', async () => {
       const req = await request(app).get('/api/auth/me');

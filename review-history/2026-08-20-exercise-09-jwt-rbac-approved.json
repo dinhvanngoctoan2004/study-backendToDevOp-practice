@@ -1,0 +1,35 @@
+{
+  "review_metadata": {
+    "date": "2026-08-20",
+    "exercise_id": "EX-09",
+    "topic": "GĐ3: JWT Authentication, HttpOnly Cookie & RBAC Authorization",
+    "reviewer": "Antigravity Code Reviewer"
+  },
+  "overall_score": 9.75,
+  "verdict": "APPROVED",
+  "critical_issues": [],
+  "improvements": [
+    {
+      "file": "src/routes/auth.routes.ts",
+      "line": 17,
+      "impact": "RESTful Convention",
+      "suggestion": "Dùng router.get('/me', ...) thay vì router.post('/me', ...) vì lấy thông tin profile là thao tác đọc dữ liệu (Idempotent / Read-only)."
+    },
+    {
+      "file": "tests/integration/token.ts",
+      "line": 1,
+      "impact": "Test Durability",
+      "suggestion": "Sinh token động qua generateToken() trong bài test để tránh token tĩnh hết hạn trong tương lai."
+    }
+  ],
+  "positives": [
+    "Thiết kế Role-Based Access Control (RBAC) middleware rolePermissions gọn gàng và dễ mở rộng.",
+    "Cấu hình HttpOnly Cookie, SameSite lax và cờ Secure động theo môi trường NODE_ENV đúng chuẩn bảo mật OWASP.",
+    "Tách biệt rõ ràng giữa tầng Utils (jwt.utils.ts, AppError.utils.ts) và tầng Middleware (jwt.validation.ts, role.middleware.ts).",
+    "Mở rộng kiểu Express.Request với req.user an toàn TypeScript.",
+    "Bảo vệ thành công route POST /api/events với cả 2 tầng gác cổng: jwtValidation và rolePermissions('organizer').",
+    "Bộ test tích hợp Supertest bao phủ 24/24 tests thành công 100%."
+  ],
+  "checkpoint_status": "PASSED",
+  "recommendation_for_mentor": "Người học đã làm chủ hoàn toàn JWT, Cookie Security và RBAC. Cho phép vượt qua phần 1 của GĐ3 và tiến hành phần tiếp theo: Rate Limiting (express-rate-limit), CORS và NoSQL Injection."
+}
