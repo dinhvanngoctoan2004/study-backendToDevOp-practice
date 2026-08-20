@@ -3,6 +3,8 @@ import request from 'supertest';
 import app from '../../src/app';
 import { connectMongo } from '../../src/config/mongo.js';
 import mongoose from 'mongoose';
+import { tokenCustomer } from './token.js';
+import { email } from 'zod';
 
 describe('Auth API - Integration Test', () => {
   beforeAll(async () => {
@@ -97,11 +99,30 @@ describe('Auth API - Integration Test', () => {
   describe('/api/auth/login - Input Validation', () => {
     it('case 1: đăng nhập thành công trả về đủ dữ liệu ', async () => {
       const req = await request(app).post('/api/auth/login').send({
-        email: 'toan_benchmark_2@gmail.com',
+        email: 'client@gmail.com',
         password: '123456789',
       });
       expect(req.status).toBe(200);
       expect(req.header['set-cookie']).toBeDefined();
+    });
+  });
+
+  describe('/api/auth/me - Input Validation', () => {
+    it('case 1: bị chặn khi không có token', async () => {
+      const req = await request(app).get('/api/auth/me');
+
+      expect(req.status).toBe(401);
+    });
+
+    it('case 2: trả về dữ liệu đầy đủ', async () => {
+      const req = await request(app)
+        .get('/api/auth/me')
+        .set('Cookie', [`access_token=${tokenCustomer}`]);
+
+      expect(req.status).toBe(200);
+      expect(req.body.data).toHaveProperty('email');
+      expect(req.body.data).toHaveProperty('profile');
+      expect(req.body.data).not.toHaveProperty('password');
     });
   });
 });

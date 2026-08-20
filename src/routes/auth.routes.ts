@@ -14,7 +14,7 @@ router.post('/register', validate(registerSchema), (req, res, next) =>
   authController.register(req, res, next),
 );
 
-router.post('/me', jwtValidation, (req, res, next) => authController.me(req, res, next));
+router.get('/me', jwtValidation, (req, res, next) => authController.me(req, res, next));
 
 router.post('/logout', (req, res, next) => authController.logout(req, res, next));
 
