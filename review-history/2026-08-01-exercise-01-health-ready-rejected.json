@@ -1,99 +1,99 @@
-{  
-  "review_metadata": {  
-    "date": "2026-08-01",  
-    "exercise": "Health & Readiness probe + MongoDB connection",  
-    "phase": "Backend - Bước khởi tạo Express + health/ready endpoints, kết nối MongoDB",  
-    "commit_hash": "8971272",  
-    "files_reviewed": ["src/index.ts", "src/config/mongo.ts"]  
-  },  
-  "overall_score": 3,  
-  "verdict": "REJECTED",  
-  "critical_issues": [  
-    {  
-      "severity": "CRITICAL",  
-      "file": "src/index.ts",  
-      "line": 15,  
-      "issue": "Handler GET /health không bao giờ gửi response.",  
-      "impact": "Mọi request /health bị treo tới khi client timeout — liveness probe hỏng hoàn toàn.",  
-      "suggestion": "Sau khi xử lý xong phải trả res.status(200).json({...}); và /health không nên phụ thuộc DB."  
-    },  
-    {  
-      "severity": "CRITICAL",  
-      "file": "src/index.ts",  
-      "line": 20,  
-      "issue": "Gọi process.exit(1) bên trong request handler.",  
-      "impact": "Một request lỗi giết cả process → tự gây DoS. Hơn nữa connectMongo đã nuốt lỗi nên catch này gần như dead code.",  
-      "suggestion": "Không exit trong route; trả 503 khi dependency lỗi. process.exit chỉ dùng ở bootstrap."  
-    },  
-    {  
-      "severity": "CRITICAL",  
-      "file": "src/index.ts",  
-      "line": 11,  
-      "issue": "connectMongo() không được gọi lúc khởi động, chỉ connect lazily trong /health.",  
-      "impact": "/ready luôn báo disconnected cho tới khi ai đó gọi /health trước — readiness sai ngay sau khi start.",  
-      "suggestion": "Connect DB một lần ở bootstrap (trước/trong callback app.listen)."  
-    },  
-    {  
-      "severity": "HIGH",  
-      "file": "src/index.ts",  
-      "line": 15,  
-      "issue": "Đảo ngữ nghĩa liveness vs readiness: /health đi kết nối DB.",  
-      "impact": "Liveness gắn DB → DB chậm/sập làm orchestrator restart pod liên tục dù app vẫn sống.",  
-      "suggestion": "/health chỉ trả 200 xác nhận process sống; /ready mới kiểm tra DB (logic /ready hiện đang đúng hướng)."  
-    }  
-  ],  
-  "improvements": [  
-    {  
-      "severity": "MEDIUM",  
-      "file": "src/config/mongo.ts",  
-      "line": 20,  
-      "issue": "connectMongo nuốt lỗi (chỉ log), trả void, không rethrow.",  
-      "impact": "Caller không biết connect thành/bại để fail-fast lúc bootstrap.",  
-      "suggestion": "throw lại lỗi hoặc trả trạng thái; xử lý exit ở tầng bootstrap."  
-    },  
-    {  
-      "severity": "MEDIUM",  
-      "file": "src/index.ts",  
-      "line": 34,  
-      "issue": "Typo payload: key `databse` và giá trị 'connected;' có ; thừa.",  
-      "impact": "Client/monitoring parse field database nhận undefined; khó so khớp test/alert.",  
-      "suggestion": "Sửa thành database: 'connected'; chuẩn hóa schema response 200 và 503."  
-    },  
-    {  
-      "severity": "LOW",  
-      "file": "src/index.ts",  
-      "line": 25,  
-      "issue": "Biến `idDBConnected` nên là isDBConnected; nhiều req không dùng.",  
-      "impact": "Giảm readability, naming boolean gây hiểu nhầm.",  
-      "suggestion": "Đổi tên đúng nghĩa is-; bỏ/đặt *req cho tham số không dùng."  
-    },  
-    {  
-      "severity": "LOW",  
-      "file": "src/config/mongo.ts",  
-      "line": 3,  
-      "issue": "isConnected là dead state; nhiều typo log ('runing','succcessfully','enviroment').",  
-      "impact": "State thừa gây nhiễu; log sai chính tả khó grep khi vận hành.",  
-      "suggestion": "Bỏ isConnected hoặc export getter dùng trong /ready; sửa log; cân nhắc Pino thay console."  
-    }  
-  ],  
-  "positives": [  
-    "/ready dùng đúng mongoose.connection.readyState === 1 và trả 503 khi chưa sẵn sàng.",  
-    "Đã tách config DB ra src/config/mongo.ts đúng cấu trúc README.",  
-    "connectMongo has maxPoolSize + timeout — có ý thức về pool và fail-fast.",  
-    "Đã kiểm tra thiếu MONGO_URI trước khi connect."  
-  ],  
-  "checkpoint_status": {  
-    "meets_requirements": [  
-      "Có endpoint /ready phản ánh trạng thái DB (200/503)",  
-      "Có module kết nối MongoDB riêng with pool/timeout"  
-    ],  
-    "missing_requirements": [  
-      "/health trả response hợp lệ (đang treo)",  
-      "Kết nối DB thiết lập một lần lúc khởi động",  
-      "Phân tách đúng liveness (/health) vs readiness (/ready)",  
-      "Không giết process trong request handler"  
-    ],  
-    "note": "≥3 lỗi CRITICAL nên REJECTED. Ý tưởng /ready đúng hướng, cần sửa vòng đời kết nối và ngữ nghĩa health/ready."  
-  },  
-  "recommendation_for_mentor": "Buổi tới nhấn mạnh liveness vs readiness (liveness không chạm dependency) và vòng đời kết nối DB: connect MỘT lần lúc bootstrap, fail-fast khi start chứ không exit trong route. Cho học viên viết supertest để tự phát hiện /health bị treo."  
+{
+  "review_metadata": {
+    "date": "2026-08-01",
+    "exercise": "Health & Readiness probe + MongoDB connection",
+    "phase": "Backend - Bước khởi tạo Express + health/ready endpoints, kết nối MongoDB",
+    "commit_hash": "8971272",
+    "files_reviewed": ["src/index.ts", "src/config/mongo.ts"]
+  },
+  "overall_score": 3,
+  "verdict": "REJECTED",
+  "critical_issues": [
+    {
+      "severity": "CRITICAL",
+      "file": "src/index.ts",
+      "line": 15,
+      "issue": "Handler GET /health không bao giờ gửi response.",
+      "impact": "Mọi request /health bị treo tới khi client timeout — liveness probe hỏng hoàn toàn.",
+      "suggestion": "Sau khi xử lý xong phải trả res.status(200).json({...}); và /health không nên phụ thuộc DB."
+    },
+    {
+      "severity": "CRITICAL",
+      "file": "src/index.ts",
+      "line": 20,
+      "issue": "Gọi process.exit(1) bên trong request handler.",
+      "impact": "Một request lỗi giết cả process → tự gây DoS. Hơn nữa connectMongo đã nuốt lỗi nên catch này gần như dead code.",
+      "suggestion": "Không exit trong route; trả 503 khi dependency lỗi. process.exit chỉ dùng ở bootstrap."
+    },
+    {
+      "severity": "CRITICAL",
+      "file": "src/index.ts",
+      "line": 11,
+      "issue": "connectMongo() không được gọi lúc khởi động, chỉ connect lazily trong /health.",
+      "impact": "/ready luôn báo disconnected cho tới khi ai đó gọi /health trước — readiness sai ngay sau khi start.",
+      "suggestion": "Connect DB một lần ở bootstrap (trước/trong callback app.listen)."
+    },
+    {
+      "severity": "HIGH",
+      "file": "src/index.ts",
+      "line": 15,
+      "issue": "Đảo ngữ nghĩa liveness vs readiness: /health đi kết nối DB.",
+      "impact": "Liveness gắn DB → DB chậm/sập làm orchestrator restart pod liên tục dù app vẫn sống.",
+      "suggestion": "/health chỉ trả 200 xác nhận process sống; /ready mới kiểm tra DB (logic /ready hiện đang đúng hướng)."
+    }
+  ],
+  "improvements": [
+    {
+      "severity": "MEDIUM",
+      "file": "src/config/mongo.ts",
+      "line": 20,
+      "issue": "connectMongo nuốt lỗi (chỉ log), trả void, không rethrow.",
+      "impact": "Caller không biết connect thành/bại để fail-fast lúc bootstrap.",
+      "suggestion": "throw lại lỗi hoặc trả trạng thái; xử lý exit ở tầng bootstrap."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "src/index.ts",
+      "line": 34,
+      "issue": "Typo payload: key `databse` và giá trị 'connected;' có ; thừa.",
+      "impact": "Client/monitoring parse field database nhận undefined; khó so khớp test/alert.",
+      "suggestion": "Sửa thành database: 'connected'; chuẩn hóa schema response 200 và 503."
+    },
+    {
+      "severity": "LOW",
+      "file": "src/index.ts",
+      "line": 25,
+      "issue": "Biến `idDBConnected` nên là isDBConnected; nhiều req không dùng.",
+      "impact": "Giảm readability, naming boolean gây hiểu nhầm.",
+      "suggestion": "Đổi tên đúng nghĩa is-; bỏ/đặt *req cho tham số không dùng."
+    },
+    {
+      "severity": "LOW",
+      "file": "src/config/mongo.ts",
+      "line": 3,
+      "issue": "isConnected là dead state; nhiều typo log ('runing','succcessfully','enviroment').",
+      "impact": "State thừa gây nhiễu; log sai chính tả khó grep khi vận hành.",
+      "suggestion": "Bỏ isConnected hoặc export getter dùng trong /ready; sửa log; cân nhắc Pino thay console."
+    }
+  ],
+  "positives": [
+    "/ready dùng đúng mongoose.connection.readyState === 1 và trả 503 khi chưa sẵn sàng.",
+    "Đã tách config DB ra src/config/mongo.ts đúng cấu trúc README.",
+    "connectMongo has maxPoolSize + timeout — có ý thức về pool và fail-fast.",
+    "Đã kiểm tra thiếu MONGO_URI trước khi connect."
+  ],
+  "checkpoint_status": {
+    "meets_requirements": [
+      "Có endpoint /ready phản ánh trạng thái DB (200/503)",
+      "Có module kết nối MongoDB riêng with pool/timeout"
+    ],
+    "missing_requirements": [
+      "/health trả response hợp lệ (đang treo)",
+      "Kết nối DB thiết lập một lần lúc khởi động",
+      "Phân tách đúng liveness (/health) vs readiness (/ready)",
+      "Không giết process trong request handler"
+    ],
+    "note": "≥3 lỗi CRITICAL nên REJECTED. Ý tưởng /ready đúng hướng, cần sửa vòng đời kết nối và ngữ nghĩa health/ready."
+  },
+  "recommendation_for_mentor": "Buổi tới nhấn mạnh liveness vs readiness (liveness không chạm dependency) và vòng đời kết nối DB: connect MỘT lần lúc bootstrap, fail-fast khi start chứ không exit trong route. Cho học viên viết supertest để tự phát hiện /health bị treo."
 }

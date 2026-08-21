@@ -1,18 +1,12 @@
 \# Project: Backend → DevSecOps Practice
 
-
-
 > Dự án thực hành cho lộ trình học Backend → DevSecOps.
 
 > Roadmap và tài liệu học tập ở repo: `study-backend-devops`.
 
-
-
 \## Bối cảnh
 
 Đang thực hành trên \*\*F3-DevTalk\*\* — nền tảng TOEIC/e-learning.
-
-
 
 \## Tech stack (theo roadmap)
 
@@ -38,8 +32,6 @@
 
 \- \*\*Cloud:\*\* AWS EC2 (initial)
 
-
-
 \## Cấu trúc thư mục
 src/
 
@@ -57,7 +49,6 @@ src/
 
 └── config/ # App config (db, env)
 
-
 \## Review workflow
 
 Mọi bài tập được review bởi AI Code Reviewer (Chat kết nối với repo này).
@@ -65,8 +56,6 @@ Mọi bài tập được review bởi AI Code Reviewer (Chat kết nối với 
 Review được lưu tại `review-history/` dưới dạng JSON.
 
 Xem `AGENTS.md` để biết format JSON và quy tắc.
-
-
 
 \## Scripts
 
@@ -90,3 +79,4 @@ Environment files
 .env.production — production (không commit giá trị thật)
 
 
+```

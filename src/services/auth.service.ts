@@ -33,7 +33,7 @@ export class AuthService {
   }
 
   async me(input: TokenPayload) {
-    const { userId, role } = input;
+    const { userId } = input;
     return await this.userRepo.findById(userId);
   }
 }
