@@ -1,0 +1,51 @@
+version: '3.8'
+
+services:
+  # ==========================================
+  # 1. Database Service (MongoDB)
+  # ==========================================
+  mongo:
+    image: mongo:7.0
+    container_name: backend_practice_mongo
+    restart: always
+    ports:
+      - '27017:27017' # Mở cổng để TablePlus/DBeaver ở máy ngoài có thể kết nối vào
+    volumes:
+      - mongo_data:/data/db # Lưu trữ dữ liệu an toàn (Data Persistence) kể cả khi tắt container
+    networks:
+      - app-network
+
+  # ==========================================
+  # 2. Backend Application Service (Node.js API)
+  # ==========================================
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: backend-practice:latest
+    container_name: backend_practice_app
+    restart: always
+    ports:
+      - '3000:3000'
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      # 💡 Lưu ý: Trong mạng Docker, 'mongo' chính là domain trỏ tới container MongoDB ở trên!
+      - MONGO_URI=mongodb://mongo:27017/event_booking
+      - JWT_KEY=super_secret_jwt_key_production_2026
+      - JWT_EXPIRES_IN=7d
+      - LOG_LEVEL=info
+    depends_on:
+      - mongo # Đợi MongoDB khởi động trước rồi App mới chạy
+    networks:
+      - app-network
+
+# ==========================================
+# 3. Volumes & Networks
+# ==========================================
+volumes:
+  mongo_data: # Khối ổ đĩa ảo lưu trữ dữ liệu MongoDB bền vững
+
+networks:
+  app-network: # Mạng nội bộ kết nối bảo mật giữa App và Database
+    driver: bridge
