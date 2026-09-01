@@ -7,6 +7,7 @@ import { tokenCustomer } from './token.js';
 import { email } from 'zod';
 
 describe('Auth API - Integration Test', () => {
+  let token: string;
   beforeAll(async () => {
     await connectMongo();
   });
@@ -99,9 +100,10 @@ describe('Auth API - Integration Test', () => {
   describe('/api/auth/login - Input Validation', () => {
     it('case 1: đăng nhập thành công trả về đủ dữ liệu ', async () => {
       const req = await request(app).post('/api/auth/login').send({
-        email: 'client@gmail.com',
+        email: 'toan123@gmail.com',
         password: '123456789',
       });
+      token = req.header['set-cookie'];
       expect(req.status).toBe(200);
       expect(req.header['set-cookie']).toBeDefined();
     });
@@ -157,7 +159,7 @@ describe('Auth API - Integration Test', () => {
     it('case 2: trả về dữ liệu đầy đủ', async () => {
       const req = await request(app)
         .get('/api/auth/me')
-        .set('Cookie', [`access_token=${tokenCustomer}`]);
+        .set('Cookie', [`access_token=${token}`]);
 
       expect(req.status).toBe(200);
       expect(req.body.data).toHaveProperty('email');
