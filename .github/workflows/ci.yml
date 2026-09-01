@@ -30,7 +30,7 @@ jobs:
           cache: 'pnpm'
 
       - name: 4. install Dependencies
-        run: pnpm install --frozen-lockfile
+        run: pnpm install --frozen-lockfile --ignore-scripts
 
       - name: 5. build Monorepo contracts
         run: pnpm --filter @repo/contracts build
