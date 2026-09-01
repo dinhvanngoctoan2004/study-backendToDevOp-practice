@@ -9,6 +9,13 @@ on:
 jobs:
   test-and-build:
     runs-on: ubuntu-latest
+
+    services:
+      mongodb:
+        image: mongo:7.0
+        ports:
+          - 27017:27017
+
     steps:
       - name: 1. Checkout source code
         uses: actions/checkout@v4
