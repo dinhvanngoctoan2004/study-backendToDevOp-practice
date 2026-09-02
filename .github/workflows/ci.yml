@@ -9,6 +9,13 @@ on:
 jobs:
   test-and-build:
     runs-on: ubuntu-latest
+
+    services:
+      mongodb:
+        image: mongo:7.0
+        ports:
+          - 27017:27017
+
     steps:
       - name: 1. Checkout source code
         uses: actions/checkout@v4
@@ -23,7 +30,7 @@ jobs:
           cache: 'pnpm'
 
       - name: 4. install Dependencies
-        run: pnpm install --frozen-lockfile
+        run: pnpm install --frozen-lockfile --ignore-scripts
 
       - name: 5. build Monorepo contracts
         run: pnpm --filter @repo/contracts build
@@ -35,6 +42,11 @@ jobs:
 
       - name: 7. run 100% test
         run: pnpm test
+        env:
+          NODE_ENV: test
+          PORT: 3000
+          MONGO_URI: mongodb://127.0.0.1:27017/test_db
+          JWT_KEY: test_super_secret_jwt_key_123456_for_ci
 
       - name: 8. login Docker hub
         uses: docker/login-action@v3
