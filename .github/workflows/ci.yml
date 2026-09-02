@@ -1,4 +1,4 @@
-name: CI/CD test Pipeline
+name: CI
 
 on: [push, pull_request]
 
