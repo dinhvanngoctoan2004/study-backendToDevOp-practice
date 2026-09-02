@@ -4,7 +4,7 @@ import { env } from '../config/env.js';
 
 export const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  limit: env.NODE_ENV === 'test' ? 10 : 5,
+  limit: env.NODE_ENV === 'test' ? 15 : 5,
   standardHeaders: 'draft-7',
   handler: (_req, _res, _next) => {
     throw new AppError(

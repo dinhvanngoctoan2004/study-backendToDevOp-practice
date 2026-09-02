@@ -97,13 +97,38 @@ describe('Auth API - Integration Test', () => {
     });
   });
   /////////////////////////////////////////////
+  describe('/api/auth/me - Input Validation', () => {
+    it('case 1: bị chặn khi không có token', async () => {
+      const req = await request(app).get('/api/auth/me');
+
+      expect(req.status).toBe(401);
+    });
+
+    it('case 2: trả về dữ liệu đầy đủ', async () => {
+      const reqLogin = await request(app).post('/api/auth/login').send({
+        email: 'toan123@gmail.com',
+        password: '123456789',
+      });
+
+      const req = await request(app)
+        .get('/api/auth/me')
+        .set('Cookie', reqLogin.header['set-cookie']);
+
+      expect(req.status).toBe(200);
+      expect(req.body.data).toHaveProperty('email');
+      expect(req.body.data).toHaveProperty('profile');
+      expect(req.body.data).not.toHaveProperty('password');
+    });
+  });
+
+  /////////////////////////////////////////////
   describe('/api/auth/login - Input Validation', () => {
     it('case 1: đăng nhập thành công trả về đủ dữ liệu ', async () => {
       const req = await request(app).post('/api/auth/login').send({
         email: 'toan123@gmail.com',
         password: '123456789',
       });
-      token = req.header['set-cookie'];
+
       expect(req.status).toBe(200);
       expect(req.header['set-cookie']).toBeDefined();
     });
@@ -121,50 +146,18 @@ describe('Auth API - Integration Test', () => {
     });
 
     it('case 3: gửi req liên tục để xem có bị chặn vì đăng nhập nhiều hay không', async () => {
+      for (let i = 0; i < 10; i++) {
+        const req = await request(app).post('/api/auth/login').send({
+          email: 'client@gmail.com',
+          password: '123456789',
+        });
+      }
       const req = await request(app).post('/api/auth/login').send({
-        email: 'client@gmail.com',
+        email: 'toan123@gmail.com',
         password: '123456789',
       });
-      const req1 = await request(app).post('/api/auth/login').send({
-        email: 'client@gmail.com',
-        password: '123456789',
-      });
-      const req2 = await request(app).post('/api/auth/login').send({
-        email: 'client@gmail.com',
-        password: '123456789',
-      });
-      const req3 = await request(app).post('/api/auth/login').send({
-        email: 'client@gmail.com',
-        password: '123456789',
-      });
-      const req4 = await request(app).post('/api/auth/login').send({
-        email: 'client@gmail.com',
-        password: '123456789',
-      });
-      const req5 = await request(app).post('/api/auth/login').send({
-        email: 'client@gmail.com',
-        password: '123456789',
-      });
-      expect(req5.status).toBe(429);
-    });
-  });
-  //////////////////////////////
-  describe('/api/auth/me - Input Validation', () => {
-    it('case 1: bị chặn khi không có token', async () => {
-      const req = await request(app).get('/api/auth/me');
 
-      expect(req.status).toBe(401);
-    });
-
-    it('case 2: trả về dữ liệu đầy đủ', async () => {
-      const req = await request(app)
-        .get('/api/auth/me')
-        .set('Cookie', [`access_token=${token}`]);
-
-      expect(req.status).toBe(200);
-      expect(req.body.data).toHaveProperty('email');
-      expect(req.body.data).toHaveProperty('profile');
-      expect(req.body.data).not.toHaveProperty('password');
+      expect(req.status).toBe(429);
     });
   });
 });
